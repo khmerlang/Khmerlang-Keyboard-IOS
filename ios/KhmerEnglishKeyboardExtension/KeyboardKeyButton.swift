@@ -1,13 +1,28 @@
 import UIKit
 
+enum KeyboardKeyAction {
+    case tap
+    case longPress
+    case repeatTick
+}
+
 final class KeyboardKeyButton: UIButton {
     private var didLongPress = false
     private var key: KeyboardKey?
-    private var onKeyPress: ((_ key: KeyboardKey, _ longPress: Bool) -> Void)?
+    private var onAction: ((_ key: KeyboardKey, _ action: KeyboardKeyAction) -> Void)?
 
-    init(key: KeyboardKey, onKeyPress: @escaping (_ key: KeyboardKey, _ longPress: Bool) -> Void) {
+    private var repeatTimer: Timer?
+
+    // Mirrors Kotlin: LONG_PRESS_DELAY = 500, REPEAT_INTERVAL = 50.
+    private let initialRepeatDelayMs: TimeInterval = 0.5
+    private let repeatIntervalMs: TimeInterval = 0.05
+
+    init(
+        key: KeyboardKey,
+        onAction: @escaping (_ key: KeyboardKey, _ action: KeyboardKeyAction) -> Void
+    ) {
         self.key = key
-        self.onKeyPress = onKeyPress
+        self.onAction = onAction
         super.init(frame: .zero)
 
         setTitle(key.label, for: .normal)
@@ -20,12 +35,22 @@ final class KeyboardKeyButton: UIButton {
         showsTouchWhenHighlighted = true
 
         addTarget(self, action: #selector(handleTapDown), for: .touchDown)
-        addTarget(self, action: #selector(handleTapUp), for: .touchUpInside)
+        addTarget(self, action: #selector(handleTapUpInside), for: .touchUpInside)
+        addTarget(self, action: #selector(handleTouchCancelled), for: .touchCancel)
+        addTarget(self, action: #selector(handleTouchCancelled), for: .touchUpOutside)
+        addTarget(self, action: #selector(handleTouchCancelled), for: .touchDragExit)
 
-        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
-        longPress.minimumPressDuration = 0.45
-        longPress.cancelsTouchesInView = true
-        addGestureRecognizer(longPress)
+        if key.isRepeatable {
+            // For repeatable keys (like Delete), long-press is not needed; we repeat while holding.
+            return
+        }
+
+        if key.longPressCode != nil {
+            let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
+            longPress.minimumPressDuration = 0.45
+            longPress.cancelsTouchesInView = true
+            addGestureRecognizer(longPress)
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -37,29 +62,49 @@ final class KeyboardKeyButton: UIButton {
     }
 
     @objc private func handleTapDown() {
-        // Reset between interactions.
         didLongPress = false
+
+        guard let key else { return }
+        guard key.isRepeatable else { return }
+
+        // Schedule auto-repeat while holding the key.
+        repeatTimer?.invalidate()
+        repeatTimer = Timer.scheduledTimer(withTimeInterval: initialRepeatDelayMs, repeats: false) { [weak self] _ in
+            guard let self, let key = self.key else { return }
+            // Now start repeating at fixed interval.
+            self.repeatTimer?.invalidate()
+            self.repeatTimer = Timer.scheduledTimer(withTimeInterval: self.repeatIntervalMs, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                self.onAction?(key, .repeatTick)
+            }
+        }
+        RunLoop.main.add(repeatTimer!, forMode: .common)
     }
 
-    @objc private func handleTapUp() {
+    @objc private func handleTapUpInside() {
         guard let key else { return }
+        stopRepeatIfNeeded()
+
         guard !didLongPress else { return }
-        onKeyPress?(key, false)
+        onAction?(key, .tap)
     }
 
     @objc private func handleLongPress(_ gr: UILongPressGestureRecognizer) {
-        guard let key, let onKeyPress else { return }
+        guard let key, let onAction else { return }
         guard gr.state == .began else { return }
 
-        // If key has no long-press output, treat it as a normal tap.
-        guard key.longPressCode != nil else {
-            didLongPress = true
-            onKeyPress(key, false)
-            return
-        }
-
         didLongPress = true
-        onKeyPress(key, true)
+        onAction(key, .longPress)
+    }
+
+    @objc private func handleTouchCancelled() {
+        didLongPress = false
+        stopRepeatIfNeeded()
+    }
+
+    private func stopRepeatIfNeeded() {
+        repeatTimer?.invalidate()
+        repeatTimer = nil
     }
 }
 
