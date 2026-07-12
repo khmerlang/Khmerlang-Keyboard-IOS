@@ -116,7 +116,7 @@ final class SuggestionBarView: UIView {
     private func renderSettings() {
         clearStack()
         // Spell check is the future premium feature; hidden when not entitled.
-        if SharedStore.spellCheckEnabled {
+        if SharedStore.spellCheckEnabled && SharedStore.spellCheckConsentGranted {
             let check = UIButton(type: .system, primaryAction: UIAction { [weak self] _ in
                 guard let self else { return }
                 self.showingSettings = false

@@ -409,6 +409,10 @@ extension KeyboardViewController: SpellCheckPanelViewDelegate {
         ])
         spellCheckPanel = panel
 
+        guard SharedStore.spellCheckEnabled && SharedStore.spellCheckConsentGranted else {
+            panel.show(message: "Cloud spell check is disabled.\nEnable it in the Khmerlang app first.")
+            return
+        }
         guard hasFullAccess else {
             panel.show(message: "Spell check needs Full Access.\nEnable it in Settings › General › Keyboard › Keyboards › Khmerlang.")
             return

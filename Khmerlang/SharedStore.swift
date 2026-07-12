@@ -71,13 +71,20 @@ enum SharedStore {
         defaults?.integer(forKey: customMappingsVersionKey) ?? 0
     }
 
-    /// Whether the server spell-check feature is available. Defaults to true
-    /// while the feature is in testing; this is the future PREMIUM gate — the
-    /// container app will set it from the in-app-purchase receipt before
-    /// public release.
+    /// Whether the server spell-check feature is available.
+    /// Defaults to false so cloud requests are opt-in for public release.
     static var spellCheckEnabled: Bool {
-        get { defaults?.object(forKey: spellCheckEnabledKey) as? Bool ?? true }
+        get { defaults?.object(forKey: spellCheckEnabledKey) as? Bool ?? false }
         set { defaults?.set(newValue, forKey: spellCheckEnabledKey) }
     }
     private static let spellCheckEnabledKey = "key_spell_check_enabled"
+
+    /// Whether the user explicitly granted consent for cloud spell-checking.
+    /// Kept separate from the entitlement/feature flag so UI can explain why
+    /// spell check is unavailable when either gate is off.
+    static var spellCheckConsentGranted: Bool {
+        get { defaults?.object(forKey: spellCheckConsentKey) as? Bool ?? false }
+        set { defaults?.set(newValue, forKey: spellCheckConsentKey) }
+    }
+    private static let spellCheckConsentKey = "key_spell_check_consent"
 }

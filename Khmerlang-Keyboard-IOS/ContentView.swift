@@ -12,6 +12,8 @@ struct ContentView: View {
     @State private var tryOutText: String = ""
     @State private var romanEnabled = SharedStore.romanCorrectionEnabled
     @State private var englishEnabled = SharedStore.englishCorrectionEnabled
+    @State private var cloudSpellCheckEnabled = SharedStore.spellCheckEnabled
+    @State private var cloudSpellCheckConsent = SharedStore.spellCheckConsentGranted
 
     var body: some View {
         NavigationStack {
@@ -39,11 +41,11 @@ struct ContentView: View {
 
                 Section {
                     Toggle("Roman → Khmer suggestions", isOn: $romanEnabled)
-                        .onChange(of: romanEnabled) { _, value in
+                        .onChange(of: romanEnabled) { value in
                             SharedStore.romanCorrectionEnabled = value
                         }
                     Toggle("English suggestions", isOn: $englishEnabled)
-                        .onChange(of: englishEnabled) { _, value in
+                        .onChange(of: englishEnabled) { value in
                             SharedStore.englishCorrectionEnabled = value
                         }
                     NavigationLink {
@@ -55,6 +57,36 @@ struct ContentView: View {
                     Text("Suggestions")
                 } footer: {
                     Text("Toggles control what appears when typing with Latin letters. Changes apply the next time the keyboard opens.")
+                }
+
+                Section {
+                    Toggle("I consent to cloud spell check", isOn: $cloudSpellCheckConsent)
+                        .onChange(of: cloudSpellCheckConsent) { value in
+                            SharedStore.spellCheckConsentGranted = value
+                            if !value {
+                                cloudSpellCheckEnabled = false
+                                SharedStore.spellCheckEnabled = false
+                            }
+                        }
+                    Toggle("Enable cloud spell check in keyboard", isOn: $cloudSpellCheckEnabled)
+                        .disabled(!cloudSpellCheckConsent)
+                        .onChange(of: cloudSpellCheckEnabled) { value in
+                            if value, !cloudSpellCheckConsent {
+                                cloudSpellCheckEnabled = false
+                                SharedStore.spellCheckEnabled = false
+                            } else {
+                                SharedStore.spellCheckEnabled = value
+                            }
+                        }
+                    NavigationLink {
+                        PrivacyPolicyView()
+                    } label: {
+                        Label("Privacy policy", systemImage: "lock.doc")
+                    }
+                } header: {
+                    Text("Cloud spell check")
+                } footer: {
+                    Text("When enabled, typed text before the cursor is sent to Khmerlang servers to return spelling suggestions. This requires Full Access for the keyboard extension.")
                 }
 
                 Section("Tips") {
