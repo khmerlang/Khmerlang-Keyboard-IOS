@@ -38,16 +38,20 @@ final class SuggestionProvider {
             }
         }
 
-        // 2. Fuzzy spelling correction from the Khmerlang model.
-        results.append(contentsOf: corrector.correct(word: word, language: language,
-                                                      prevOne: prevOne, prevTwo: prevTwo,
-                                                      isStartSentence: isStartSentence))
-
-        // 3. Frequency-ranked prefix completions (English ones honour the toggle).
+        // 2+3. Prefix completions interleaved with fuzzy corrections. The typed
+        // word is often an exact prefix of the intended word (សួស្ដ → សួស្ដី),
+        // and rare words lose the count-based correction ranking — so
+        // completions must share the top bar slots rather than being appended
+        // after up to 10 corrections (which starved them entirely).
+        let corrections = corrector.correct(word: word, language: language,
+                                            prevOne: prevOne, prevTwo: prevTwo,
+                                            isStartSentence: isStartSentence)
         let langCode = (language == .khmer) ? KhmerlangDictionary.langKhmer : KhmerlangDictionary.langEnglish
+        var prefixCompletions: [String] = []
         if langCode == KhmerlangDictionary.langKhmer || SharedStore.englishCorrectionEnabled {
-            results.append(contentsOf: dictionary?.completions(prefix: word, lang: langCode, limit: 8) ?? [])
+            prefixCompletions = dictionary?.completions(prefix: word, lang: langCode, limit: 8) ?? []
         }
+        results.append(contentsOf: interleave(prefixCompletions, corrections))
 
         // 4. For English, augment with system dictionary completions + guesses.
         let checkerEnabled = (language == .english)
@@ -79,6 +83,17 @@ final class SuggestionProvider {
     }
 
     // MARK: - Helpers
+
+    /// Alternate items from both lists (a first), preserving each list's order.
+    private func interleave(_ a: [String], _ b: [String]) -> [String] {
+        var output: [String] = []
+        var i = 0, j = 0
+        while i < a.count || j < b.count {
+            if i < a.count { output.append(a[i]); i += 1 }
+            if j < b.count { output.append(b[j]); j += 1 }
+        }
+        return output
+    }
 
     private func dedupe(_ candidates: [String], excluding word: String?, limit: Int) -> [String] {
         var seen = Set<String>()

@@ -32,10 +32,17 @@ final class KhmerSegmenter {
     /// per-keystroke work.
     private static let windowScalars = 48
 
-    init(counts: [String: Int], maxWordScalars: Int, dictionary: KhmerlangDictionary) {
+    /// The Core ML BiLSTM segmenter (the Android TFLite model). Preferred
+    /// over the dictionary DP when available; nil when the model failed to
+    /// load or a run exceeds its 328-scalar window.
+    private let ml: MLWordSegmenter?
+
+    init(counts: [String: Int], maxWordScalars: Int, dictionary: KhmerlangDictionary,
+         ml: MLWordSegmenter?) {
         self.counts = counts
         self.maxWordScalars = min(max(maxWordScalars, 1), 24)
         self.dictionary = dictionary
+        self.ml = ml
         self.logTotal = log(Double(max(counts.values.reduce(0, +), 1)))
     }
 
@@ -48,6 +55,24 @@ final class KhmerSegmenter {
 
     /// Split `run` into completed context words plus the trailing composing word.
     func composingSplit(of run: String) -> Split {
+        if var segments = ml?.segment(run), !segments.isEmpty {
+            var composing = segments.removeLast()
+            // The model segments complete words; a word still being typed can
+            // come out split (សួ + ស្ដ). While the tail is not itself a word
+            // but merging with the previous segment stays on the path to a
+            // dictionary word (សួស្ដ → សួស្ដី…), merge them.
+            while let previous = segments.last, counts[composing] == nil {
+                let merged = previous + composing
+                guard merged.unicodeScalars.count <= maxWordScalars,
+                      counts[merged] != nil
+                        || !dictionary.completions(prefix: merged,
+                                                   lang: KhmerlangDictionary.langKhmer,
+                                                   limit: 1).isEmpty else { break }
+                composing = merged
+                segments.removeLast()
+            }
+            return Split(context: segments, composing: composing)
+        }
         var segments = segment(run, allowTrailingPrefix: true)
         let composing = segments.popLast() ?? ""
         return Split(context: segments, composing: composing)
@@ -55,7 +80,7 @@ final class KhmerSegmenter {
 
     /// Segment a completed run (used for next-word prediction context).
     func words(in run: String) -> [String] {
-        segment(run, allowTrailingPrefix: false)
+        ml?.segment(run) ?? segment(run, allowTrailingPrefix: false)
     }
 
     // MARK: - Dynamic programme

@@ -1,0 +1,77 @@
+[
+  {
+    "metadataOutputVersion" : "3.0",
+    "storagePrecision" : "Float32",
+    "outputSchema" : [
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Float32",
+        "formattedType" : "MultiArray (Float32 1 × 328 × 1)",
+        "shortDescription" : "",
+        "shape" : "[1, 328, 1]",
+        "name" : "Identity",
+        "type" : "MultiArray"
+      }
+    ],
+    "modelParameters" : [
+
+    ],
+    "specificationVersion" : 6,
+    "mlProgramOperationTypeHistogram" : {
+      "ListGather" : 4,
+      "Concat" : 2,
+      "MakeList" : 8,
+      "Reverse" : 4,
+      "Tanh" : 8,
+      "WhileLoop" : 4,
+      "Transpose" : 6,
+      "Matmul" : 10,
+      "ListScatter" : 4,
+      "Relu" : 1,
+      "Mul" : 12,
+      "Sigmoid" : 12,
+      "ListRead" : 4,
+      "Add" : 18,
+      "ListWrite" : 4,
+      "Reshape" : 4,
+      "Gather" : 1,
+      "Split" : 4,
+      "Less" : 4
+    },
+    "computePrecision" : "Mixed (Float32, Int32)",
+    "isUpdatable" : "0",
+    "stateSchema" : [
+
+    ],
+    "availability" : {
+      "macOS" : "12.0",
+      "tvOS" : "15.0",
+      "visionOS" : "1.0",
+      "watchOS" : "8.0",
+      "iOS" : "15.0",
+      "macCatalyst" : "15.0"
+    },
+    "modelType" : {
+      "name" : "MLModelType_mlProgram"
+    },
+    "userDefinedMetadata" : {
+      "com.github.apple.coremltools.version" : "7.2",
+      "com.github.apple.coremltools.source" : "tensorflow==2.13.1"
+    },
+    "inputSchema" : [
+      {
+        "hasShapeFlexibility" : "0",
+        "isOptional" : "0",
+        "dataType" : "Int32",
+        "formattedType" : "MultiArray (Int32 1 × 328)",
+        "shortDescription" : "",
+        "shape" : "[1, 328]",
+        "name" : "chars",
+        "type" : "MultiArray"
+      }
+    ],
+    "generatedClassName" : "WordSegModel",
+    "method" : "predict"
+  }
+]

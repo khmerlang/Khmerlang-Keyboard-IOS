@@ -101,7 +101,8 @@ final class KhmerlangCorrector {
             }
             let segmenter = KhmerSegmenter(counts: khmerCounts,
                                            maxWordScalars: maxWordScalars,
-                                           dictionary: dictionary)
+                                           dictionary: dictionary,
+                                           ml: MLWordSegmenter())
             DispatchQueue.main.async {
                 self.bkKhmer = khmer
                 self.bkRoman = roman
