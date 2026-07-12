@@ -6,9 +6,48 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D9CDBB94300280F900B82913 /* Khmerlang.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D9CDBB8D300280F900B82913 /* Khmerlang.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D9CDBB92300280F900B82913 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D9CDBB73300280D400B82913 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D9CDBB8C300280F900B82913;
+			remoteInfo = Khmerlang;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D9CDBB99300280F900B82913 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D9CDBB94300280F900B82913 /* Khmerlang.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		D9CDBB7B300280D400B82913 /* Khmerlang-Keyboard-IOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Khmerlang-Keyboard-IOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D9CDBB8D300280F900B82913 /* Khmerlang.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = Khmerlang.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D9CDBB95300280F900B82913 /* Exceptions for "Khmerlang" folder in "Khmerlang" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D9CDBB8C300280F900B82913 /* Khmerlang */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D9CDBB7D300280D400B82913 /* Khmerlang-Keyboard-IOS */ = {
@@ -16,10 +55,25 @@
 			path = "Khmerlang-Keyboard-IOS";
 			sourceTree = "<group>";
 		};
+		D9CDBB8E300280F900B82913 /* Khmerlang */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D9CDBB95300280F900B82913 /* Exceptions for "Khmerlang" folder in "Khmerlang" target */,
+			);
+			path = Khmerlang;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		D9CDBB78300280D400B82913 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D9CDBB8A300280F900B82913 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +87,7 @@
 			isa = PBXGroup;
 			children = (
 				D9CDBB7D300280D400B82913 /* Khmerlang-Keyboard-IOS */,
+				D9CDBB8E300280F900B82913 /* Khmerlang */,
 				D9CDBB7C300280D400B82913 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +96,7 @@
 			isa = PBXGroup;
 			children = (
 				D9CDBB7B300280D400B82913 /* Khmerlang-Keyboard-IOS.app */,
+				D9CDBB8D300280F900B82913 /* Khmerlang.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -55,10 +111,12 @@
 				D9CDBB77300280D400B82913 /* Sources */,
 				D9CDBB78300280D400B82913 /* Frameworks */,
 				D9CDBB79300280D400B82913 /* Resources */,
+				D9CDBB99300280F900B82913 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D9CDBB93300280F900B82913 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				D9CDBB7D300280D400B82913 /* Khmerlang-Keyboard-IOS */,
@@ -69,6 +127,28 @@
 			productName = "Khmerlang-Keyboard-IOS";
 			productReference = D9CDBB7B300280D400B82913 /* Khmerlang-Keyboard-IOS.app */;
 			productType = "com.apple.product-type.application";
+		};
+		D9CDBB8C300280F900B82913 /* Khmerlang */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D9CDBB96300280F900B82913 /* Build configuration list for PBXNativeTarget "Khmerlang" */;
+			buildPhases = (
+				D9CDBB89300280F900B82913 /* Sources */,
+				D9CDBB8A300280F900B82913 /* Frameworks */,
+				D9CDBB8B300280F900B82913 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D9CDBB8E300280F900B82913 /* Khmerlang */,
+			);
+			name = Khmerlang;
+			packageProductDependencies = (
+			);
+			productName = Khmerlang;
+			productReference = D9CDBB8D300280F900B82913 /* Khmerlang.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -81,6 +161,9 @@
 				LastUpgradeCheck = 2660;
 				TargetAttributes = {
 					D9CDBB7A300280D400B82913 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					D9CDBB8C300280F900B82913 = {
 						CreatedOnToolsVersion = 26.6;
 					};
 				};
@@ -100,12 +183,20 @@
 			projectRoot = "";
 			targets = (
 				D9CDBB7A300280D400B82913 /* Khmerlang-Keyboard-IOS */,
+				D9CDBB8C300280F900B82913 /* Khmerlang */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		D9CDBB79300280D400B82913 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D9CDBB8B300280F900B82913 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +213,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D9CDBB89300280F900B82913 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D9CDBB93300280F900B82913 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D9CDBB8C300280F900B82913 /* Khmerlang */;
+			targetProxy = D9CDBB92300280F900B82913 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		D9CDBB84300280D400B82913 /* Debug */ = {
@@ -251,6 +357,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Khmerlang-Keyboard-IOS/Khmerlang-Keyboard-IOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = BSJPU8MQ6R;
@@ -283,6 +390,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Khmerlang-Keyboard-IOS/Khmerlang-Keyboard-IOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = BSJPU8MQ6R;
@@ -310,6 +418,64 @@
 			};
 			name = Release;
 		};
+		D9CDBB97300280F900B82913 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Khmerlang/Khmerlang.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BSJPU8MQ6R;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Khmerlang/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Khmerlang;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.khmerlang.Khmerlang-Keyboard-IOS.Khmerlang";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D9CDBB98300280F900B82913 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Khmerlang/Khmerlang.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BSJPU8MQ6R;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Khmerlang/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Khmerlang;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.khmerlang.Khmerlang-Keyboard-IOS.Khmerlang";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -327,6 +493,15 @@
 			buildConfigurations = (
 				D9CDBB87300280D400B82913 /* Debug */,
 				D9CDBB88300280D400B82913 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D9CDBB96300280F900B82913 /* Build configuration list for PBXNativeTarget "Khmerlang" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D9CDBB97300280F900B82913 /* Debug */,
+				D9CDBB98300280F900B82913 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

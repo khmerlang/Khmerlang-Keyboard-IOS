@@ -1,0 +1,52 @@
+# macOS
+.DS_Store
+
+# Xcode user data
+xcuserdata/
+**/xcuserdata/
+*.xcuserstate
+
+# Xcode workspace user settings
+*.xcworkspace/xcuserdata/
+*.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+
+# Build products and intermediate files
+build/
+DerivedData/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+# Swift Package Manager
+.build/
+Packages/
+Package.pins
+Package.resolved
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+# CocoaPods / Carthage / Accio (keep if not used)
+Pods/
+Carthage/Build/
+.accio/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Archives and app bundles
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Secrets / local config
+*.env
+*.env.local
+
