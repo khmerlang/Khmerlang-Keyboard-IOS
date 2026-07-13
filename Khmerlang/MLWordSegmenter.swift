@@ -44,6 +44,9 @@ final class MLWordSegmenter {
     /// Last run → segments, so the several context queries per keystroke run
     /// inference once (the Android prevInput/prevSeg cache).
     private var cache: (input: String, output: [String])?
+    /// Serialises `segment`: it is called from the keyboard's suggestion queue
+    /// and (on suggestion pick) the main thread, and `cache` is mutable.
+    private let lock = NSLock()
 
     convenience init?(bundle: Bundle = .main) {
         guard let url = bundle.url(forResource: "WordSegModel", withExtension: "mlmodelc") else {
@@ -67,6 +70,7 @@ final class MLWordSegmenter {
     func segment(_ run: String) -> [String]? {
         let scalars = Array(run.unicodeScalars)
         guard !scalars.isEmpty, scalars.count <= Self.maxScalars else { return nil }
+        lock.lock(); defer { lock.unlock() }
         if let cache, cache.input == run { return cache.output }
 
         guard let input = try? MLMultiArray(shape: [1, NSNumber(value: Self.maxScalars)], dataType: .int32) else {

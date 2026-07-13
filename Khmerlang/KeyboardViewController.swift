@@ -19,7 +19,24 @@ class KeyboardViewController: UIInputViewController {
     private var heightConstraint: NSLayoutConstraint!
     private var spellCheckPanel: SpellCheckPanelView?
 
+    /// Candidate sources; only ever touched on `suggestionQueue` so the
+    /// UITextChecker and lexicon inside need no locking.
     private let suggestionProvider = SuggestionProvider()
+
+    /// Serial worker for candidate computation (BK-tree search, SQLite,
+    /// segmentation). Key handling never blocks on it: `handle(action:)`
+    /// returns as soon as the text edit is made and the bar refreshes when
+    /// the lookup finishes. `.utility` QoS, not `.userInitiated`: the
+    /// extension's CPU budget is small, and at a higher QoS a burst of
+    /// keystrokes lets candidate crunching starve the main thread's touch
+    /// handling — the bar may lag slightly, key presses must not.
+    private let suggestionQueue = DispatchQueue(label: "com.khmerlang.keyboard.suggestions",
+                                                qos: .utility)
+    /// Identifies the latest suggestion request. Guarded by `generationLock`:
+    /// bumped on the main thread, read on the queue so superseded requests
+    /// skip their work and never overwrite a newer bar state.
+    private var suggestionGeneration = 0
+    private let generationLock = NSLock()
 
     /// True while the bar shows next-word predictions (nothing being composed):
     /// picking one must append, not replace the previous word.
@@ -36,7 +53,8 @@ class KeyboardViewController: UIInputViewController {
         super.viewDidLoad()
         buildKeyboard()
         requestSupplementaryLexicon { [weak self] lexicon in
-            self?.suggestionProvider.lexicon = lexicon
+            guard let self else { return }
+            self.suggestionQueue.async { self.suggestionProvider.lexicon = lexicon }
         }
         // The corrector's BK-trees build in the background after each extension
         // launch; refresh the bar once fuzzy correction becomes available.
@@ -95,7 +113,8 @@ class KeyboardViewController: UIInputViewController {
         let view = KeyboardView(theme: theme)
         view.delegate = self
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.setGrid(currentGrid())
+        let grid = currentGrid()   // also refreshes lastReturnKeyType
+        view.setGrid(grid, cacheKey: gridCacheKey())
         self.view.addSubview(view)
         self.keyboardView = view
 
@@ -122,7 +141,14 @@ class KeyboardViewController: UIInputViewController {
 
     /// Rebuild only the grid (keeps the same view/height).
     private func reloadGrid() {
-        keyboardView.setGrid(currentGrid())
+        let grid = currentGrid()   // also refreshes lastReturnKeyType
+        keyboardView.setGrid(grid, cacheKey: gridCacheKey())
+    }
+
+    /// Cache key for the current layout; must change whenever the grid's
+    /// content would (the return-key label varies with the host field).
+    private func gridCacheKey() -> String {
+        "\(language)-\(page)-\(lastReturnKeyType.rawValue)"
     }
 
     /// The grid for the current language/page, with the return key relabelled
@@ -162,33 +188,75 @@ class KeyboardViewController: UIInputViewController {
 
     /// Recompute candidates and refresh the bar. While a word is being typed we
     /// show prefix completions; right after a space we show next-word predictions.
+    /// The document context is captured here (the proxy is main-thread-only);
+    /// the expensive lookup runs on `suggestionQueue`.
     private func updateSuggestions() {
-        guard let suggestionBar else { return }
-        let (word, prevOne, prevTwo) = composingContext()
-        let suggestions: [String]
-        suggestionsAreNextWords = word.isEmpty
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let language = self.language
+        scheduleSuggestions { [weak self] isCancelled in
+            guard let self else { return ([], false) }
+            return self.computeSuggestions(before: before, language: language,
+                                           isCancelled: isCancelled)
+        }
+    }
+
+    /// Run `compute` on the suggestion queue and apply its (candidates,
+    /// areNextWords) result to the bar — unless a newer request supersedes it,
+    /// in which case the work is skipped / the result dropped. `compute`
+    /// receives an `isCancelled` probe to poll between its expensive stages,
+    /// so a superseded lookup abandons mid-pipeline instead of running to
+    /// completion. The bar content and `suggestionsAreNextWords` are always
+    /// updated together, so a pick can never mix a fresh flag with stale
+    /// candidates.
+    private func scheduleSuggestions(_ compute: @escaping (_ isCancelled: () -> Bool) -> ([String], Bool)) {
+        guard suggestionBar != nil else { return }
+        generationLock.lock()
+        suggestionGeneration += 1
+        let generation = suggestionGeneration
+        generationLock.unlock()
+        suggestionQueue.async { [weak self] in
+            guard let self, self.isCurrent(generation) else { return }
+            let (suggestions, areNextWords) = compute { !self.isCurrent(generation) }
+            DispatchQueue.main.async {
+                guard self.isCurrent(generation) else { return }
+                self.suggestionsAreNextWords = areNextWords
+                self.suggestionBar.setSuggestions(suggestions)
+            }
+        }
+    }
+
+    private func isCurrent(_ generation: Int) -> Bool {
+        generationLock.lock(); defer { generationLock.unlock() }
+        return generation == suggestionGeneration
+    }
+
+    /// The candidate lookup itself; runs on `suggestionQueue`.
+    private func computeSuggestions(before: String, language: KeyboardLanguage,
+                                    isCancelled: () -> Bool) -> ([String], Bool) {
+        let (word, prevOne, prevTwo) = composingContext(before: before)
+        if isCancelled() { return ([], word.isEmpty) }
         if word.isEmpty {
             // No predictions at the start of a sentence (matches Android's
             // isStartSen guard) — "<s>" alone isn't usable context.
-            suggestions = (prevTwo.isEmpty || prevTwo == "<s>")
+            let suggestions = (prevTwo.isEmpty || prevTwo == "<s>")
                 ? [] : suggestionProvider.nextWords(prevOne: prevOne, prevTwo: prevTwo)
-        } else {
-            let before = textDocumentProxy.documentContextBeforeInput ?? ""
-            let isStartSentence = Self.isSentenceStart(String(before.dropLast(word.count)))
-            suggestions = suggestionProvider.completions(for: word, language: language,
-                                                         prevOne: prevOne, prevTwo: prevTwo,
-                                                         isStartSentence: isStartSentence)
+            return (suggestions, true)
         }
-        suggestionBar.setSuggestions(suggestions)
+        let isStartSentence = Self.isSentenceStart(String(before.dropLast(word.count)))
+        let suggestions = suggestionProvider.completions(for: word, language: language,
+                                                         prevOne: prevOne, prevTwo: prevTwo,
+                                                         isStartSentence: isStartSentence,
+                                                         isCancelled: isCancelled)
+        return (suggestions, false)
     }
 
-    /// The word being composed plus its two preceding context words. Khmer is
-    /// written without spaces, so a trailing Khmer run is split with the
-    /// dictionary segmenter (when built): the run's last segment is the
-    /// composing word and earlier segments provide the n-gram context. Latin
-    /// input keeps the whitespace-based behaviour.
-    private func composingContext() -> (word: String, prevOne: String, prevTwo: String) {
-        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+    /// The word being composed plus its two preceding context words, for the
+    /// given document context. Khmer is written without spaces, so a trailing
+    /// Khmer run is split with the dictionary segmenter (when built): the
+    /// run's last segment is the composing word and earlier segments provide
+    /// the n-gram context. Latin input keeps the whitespace-based behaviour.
+    /// Doesn't touch the proxy, so it can run on `suggestionQueue`.
+    private func composingContext(before: String) -> (word: String, prevOne: String, prevTwo: String) {
         let run = Self.trailingWord(in: before)
         let contextBefore = String(before.dropLast(run.count))
         // N-gram context never crosses a sentence boundary.
@@ -478,16 +546,19 @@ extension KeyboardViewController: SuggestionBarViewDelegate {
             proxy.insertText(insertion)
         } else {
             // Replace the composing word (scalar-accurate for Khmer clusters).
-            let word = composingContext().word
+            let word = composingContext(before: proxy.documentContextBeforeInput ?? "").word
             replaceBeforeCursor(scalarCount: word.unicodeScalars.count, with: insertion)
         }
         if isKhmerPick {
             // Follow the committed word with next-word predictions.
-            let ctx = composingContext()
-            let committed = ctx.word.isEmpty ? ctx.prevTwo : ctx.word
-            let older = ctx.word.isEmpty ? ctx.prevOne : ctx.prevTwo
-            suggestionsAreNextWords = true
-            suggestionBar.setSuggestions(suggestionProvider.nextWords(prevOne: older, prevTwo: committed))
+            let before = proxy.documentContextBeforeInput ?? ""
+            scheduleSuggestions { [weak self] _ in
+                guard let self else { return ([], true) }
+                let ctx = self.composingContext(before: before)
+                let committed = ctx.word.isEmpty ? ctx.prevTwo : ctx.word
+                let older = ctx.word.isEmpty ? ctx.prevOne : ctx.prevTwo
+                return (self.suggestionProvider.nextWords(prevOne: older, prevTwo: committed), true)
+            }
         } else {
             updateSuggestions()
         }

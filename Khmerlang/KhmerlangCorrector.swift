@@ -22,12 +22,27 @@ final class KhmerlangCorrector {
 
     let dictionary = KhmerlangDictionary()
 
-    private var bkKhmer: BKTree?
-    private var bkEnglish: BKTree?
-    private var bkRoman: BKTree?
+    /// Everything a correction pass reads, bundled so it can be swapped in
+    /// atomically. Immutable once built.
+    private struct TreeSet {
+        let khmer: BKTree
+        let english: BKTree
+        let roman: BKTree
+        let segmenter: KhmerSegmenter
+        let specialCases: [String: String]
+    }
+
+    /// Guards `treeSet`: `correct`/`segmenter` run on the keyboard's suggestion
+    /// queue while finished builds are swapped in from the main thread.
+    private let stateLock = NSLock()
+    private var treeSet: TreeSet?
+
     /// Splits spaceless Khmer runs into words; built with the trees, nil until then.
-    private(set) var segmenter: KhmerSegmenter?
-    private var specialCases: [String: String] = [:]
+    var segmenter: KhmerSegmenter? {
+        stateLock.lock(); defer { stateLock.unlock() }
+        return treeSet?.segmenter
+    }
+
     private var ready = false
     private var building = false
     /// SharedStore.customMappingsVersion the current trees were built with.
@@ -101,14 +116,13 @@ final class KhmerlangCorrector {
             }
             let segmenter = KhmerSegmenter(counts: khmerCounts,
                                            maxWordScalars: maxWordScalars,
-                                           dictionary: dictionary,
                                            ml: MLWordSegmenter())
             DispatchQueue.main.async {
-                self.bkKhmer = khmer
-                self.bkRoman = roman
-                self.bkEnglish = english
-                self.segmenter = segmenter
-                self.specialCases = special
+                let set = TreeSet(khmer: khmer, english: english, roman: roman,
+                                  segmenter: segmenter, specialCases: special)
+                self.stateLock.lock()
+                self.treeSet = set
+                self.stateLock.unlock()
                 self.builtMappingsVersion = mappingsVersion
                 self.building = false
                 self.ready = true
@@ -125,10 +139,15 @@ final class KhmerlangCorrector {
     /// building (the first seconds after each extension launch), Latin input
     /// falls back to an exact roman-prefix lookup; Khmer input is covered by
     /// the prefix completions the suggestion provider adds separately.
+    /// `isCancelled` lets a superseded request abandon between tree searches.
     func correct(word: String, language: KeyboardLanguage,
-                 prevOne: String, prevTwo: String, isStartSentence: Bool) -> [String] {
+                 prevOne: String, prevTwo: String, isStartSentence: Bool,
+                 isCancelled: () -> Bool = { false }) -> [String] {
         guard !word.isEmpty, let dictionary else { return [] }
-        guard ready else {
+        stateLock.lock()
+        let trees = treeSet
+        stateLock.unlock()
+        guard let trees else {
             if let first = word.first, !isKhmer(first), SharedStore.romanCorrectionEnabled {
                 return dictionary.romanCompletions(prefix: word.lowercased(), limit: 6)
             }
@@ -137,20 +156,20 @@ final class KhmerlangCorrector {
 
         // Scalar count, not Character count: Khmer graphemes cluster several
         // scalars, which would understate length (and thus tolerance) badly.
+        // Capped at 3: tolerance 4 visits most of the tree (~2× the search
+        // cost) while returning almost nothing that survives ranking.
         let tolerance: Int
         switch word.unicodeScalars.count {
         case ...2: tolerance = 1
         case ...4: tolerance = 2
-        case ...8: tolerance = 3
-        default:   tolerance = 4
+        default:   tolerance = 3
         }
 
         if isKhmer(word.first!) {
-            guard let tree = bkKhmer else { return [] }
-            return correctBy(dictionary: dictionary, tree: tree, isOther: false,
+            return correctBy(dictionary: dictionary, tree: trees.khmer, isOther: false,
                              misspelling: normalizeKhmer(word), lang: KhmerlangDictionary.langKhmer,
                              tolerance: tolerance, prevOne: prevOne, prevTwo: prevTwo,
-                             isStartSentence: isStartSentence)
+                             isStartSentence: isStartSentence, specialCases: trees.specialCases)
         } else {
             // Latin input: interleave roman→Khmer transliterations (from the
             // roman tree, scored with Khmer context) with English corrections,
@@ -158,18 +177,19 @@ final class KhmerlangCorrector {
             // Each source is gated by its user toggle (Android's
             // KEY_RM_CORRECTION_MODE / KEY_EN_CORRECTION_MODE).
             let lower = word.lowercased()
-            let romanOut = SharedStore.romanCorrectionEnabled ? bkRoman.map {
-                correctBy(dictionary: dictionary, tree: $0, isOther: true,
-                          misspelling: lower, lang: KhmerlangDictionary.langKhmer,
-                          tolerance: tolerance, prevOne: prevOne, prevTwo: prevTwo,
-                          isStartSentence: isStartSentence)
-            } ?? [] : []
-            let englishOut = SharedStore.englishCorrectionEnabled ? bkEnglish.map {
-                correctBy(dictionary: dictionary, tree: $0, isOther: false,
-                          misspelling: lower, lang: KhmerlangDictionary.langEnglish,
-                          tolerance: tolerance, prevOne: prevOne, prevTwo: prevTwo,
-                          isStartSentence: isStartSentence)
-            } ?? [] : []
+            let romanOut = SharedStore.romanCorrectionEnabled
+                ? correctBy(dictionary: dictionary, tree: trees.roman, isOther: true,
+                            misspelling: lower, lang: KhmerlangDictionary.langKhmer,
+                            tolerance: tolerance, prevOne: prevOne, prevTwo: prevTwo,
+                            isStartSentence: isStartSentence, specialCases: trees.specialCases)
+                : []
+            if isCancelled() { return [] }
+            let englishOut = SharedStore.englishCorrectionEnabled
+                ? correctBy(dictionary: dictionary, tree: trees.english, isOther: false,
+                            misspelling: lower, lang: KhmerlangDictionary.langEnglish,
+                            tolerance: tolerance, prevOne: prevOne, prevTwo: prevTwo,
+                            isStartSentence: isStartSentence, specialCases: trees.specialCases)
+                : []
             return interleave(romanOut, englishOut)
         }
     }
@@ -189,7 +209,8 @@ final class KhmerlangCorrector {
 
     private func correctBy(dictionary: KhmerlangDictionary, tree: BKTree, isOther: Bool,
                            misspelling: String, lang: Int32, tolerance: Int,
-                           prevOne: String, prevTwo: String, isStartSentence: Bool) -> [String] {
+                           prevOne: String, prevTwo: String, isStartSentence: Bool,
+                           specialCases: [String: String]) -> [String] {
         let tokenOne = tokenize(prevOne, lang: lang)
         let tokenTwo = tokenize(prevTwo, lang: lang)
 

@@ -26,15 +26,29 @@ final class KeyboardView: UIView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    /// Rebuild the view for a new layout.
-    func setGrid(_ grid: KeyboardGrid) {
+    /// Built button rows per cache key, so switching pages (notably the
+    /// shift revert after every shifted character) reuses views instead of
+    /// recreating ~30 buttons on the main thread mid-typing.
+    private var cachedRows: [String: [[KeyButton]]] = [:]
+
+    /// Show a layout. Pass a `cacheKey` unique to the grid's content
+    /// (language + page + return-key label) to reuse previously built buttons.
+    func setGrid(_ grid: KeyboardGrid, cacheKey: String? = nil) {
         buttonRows.forEach { $0.forEach { $0.removeFromSuperview() } }
-        buttonRows = grid.map { row in
-            row.map { key -> KeyButton in
-                let button = KeyButton(key: key, theme: theme)
-                button.delegate = delegate
-                addSubview(button)
-                return button
+        if let cacheKey, let cached = cachedRows[cacheKey] {
+            buttonRows = cached
+            cached.forEach { $0.forEach { addSubview($0) } }
+        } else {
+            buttonRows = grid.map { row in
+                row.map { key -> KeyButton in
+                    let button = KeyButton(key: key, theme: theme)
+                    button.delegate = delegate
+                    addSubview(button)
+                    return button
+                }
+            }
+            if let cacheKey {
+                cachedRows[cacheKey] = buttonRows
             }
         }
         setNeedsLayout()

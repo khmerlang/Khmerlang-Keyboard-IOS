@@ -21,29 +21,55 @@ final class KhmerSegmenter {
     /// Khmer word → unigram frequency, built alongside the corrector's BK-trees.
     private let counts: [String: Int]
     private let maxWordScalars: Int
-    private let dictionary: KhmerlangDictionary
+    /// All dictionary words in scalar-lexicographic order, for prefix-existence
+    /// checks by binary search. Replaces per-keystroke SQLite probes in the DP
+    /// tail and the ML merge loop (up to ~24 queries per segmentation).
+    private let sortedWords: [String]
     /// log of the summed unigram counts; segment scores are log-probabilities
     /// (log count − logTotal), so each extra segment costs ~logTotal and the
     /// programme prefers one frequent word over several short fragments.
     private let logTotal: Double
 
-    /// Only the tail of very long spaceless runs is segmented; suggestions need
-    /// just the composing word plus two context words, and this bounds the
-    /// per-keystroke work.
+    /// Only the tail of long spaceless runs is segmented (applies to both the
+    /// ML model and the DP); suggestions need just the composing word plus two
+    /// context words, and this bounds the per-keystroke work.
     private static let windowScalars = 48
 
     /// The Core ML BiLSTM segmenter (the Android TFLite model). Preferred
-    /// over the dictionary DP when available; nil when the model failed to
-    /// load or a run exceeds its 328-scalar window.
+    /// over the dictionary DP when available; nil when the model failed to load.
     private let ml: MLWordSegmenter?
 
-    init(counts: [String: Int], maxWordScalars: Int, dictionary: KhmerlangDictionary,
-         ml: MLWordSegmenter?) {
+    init(counts: [String: Int], maxWordScalars: Int, ml: MLWordSegmenter?) {
         self.counts = counts
         self.maxWordScalars = min(max(maxWordScalars, 1), 24)
-        self.dictionary = dictionary
+        self.sortedWords = counts.keys.sorted(by: Self.scalarLess)
         self.ml = ml
         self.logTotal = log(Double(max(counts.values.reduce(0, +), 1)))
+    }
+
+    /// Scalar-lexicographic order, so that all words sharing a prefix are
+    /// contiguous and start at the prefix's lower bound.
+    private static func scalarLess(_ a: String, _ b: String) -> Bool {
+        a.unicodeScalars.lexicographicallyPrecedes(b.unicodeScalars) { $0.value < $1.value }
+    }
+
+    /// Whether any dictionary word starts with `prefix` (in-memory; no SQLite).
+    private func hasWord(prefix: String) -> Bool {
+        var low = 0, high = sortedWords.count
+        while low < high {
+            let mid = (low + high) / 2
+            if Self.scalarLess(sortedWords[mid], prefix) { low = mid + 1 } else { high = mid }
+        }
+        guard low < sortedWords.count else { return false }
+        return sortedWords[low].unicodeScalars.starts(with: prefix.unicodeScalars)
+    }
+
+    /// The trailing `windowScalars` of a run (the only part suggestions need).
+    /// `truncated` marks that the window may start mid-word.
+    private static func window(_ run: String) -> (text: String, truncated: Bool) {
+        let scalars = Array(run.unicodeScalars)
+        guard scalars.count > windowScalars else { return (run, false) }
+        return (String(String.UnicodeScalarView(scalars.suffix(windowScalars))), true)
     }
 
     struct Split {
@@ -55,7 +81,11 @@ final class KhmerSegmenter {
 
     /// Split `run` into completed context words plus the trailing composing word.
     func composingSplit(of run: String) -> Split {
-        if var segments = ml?.segment(run), !segments.isEmpty {
+        let (windowed, truncated) = Self.window(run)
+        if var segments = ml?.segment(windowed), !segments.isEmpty {
+            // A truncated window may start mid-word; drop the unreliable first
+            // segment (it would only ever be used as distant context).
+            if truncated && segments.count > 1 { segments.removeFirst() }
             var composing = segments.removeLast()
             // The model segments complete words; a word still being typed can
             // come out split (សួ + ស្ដ). While the tail is not itself a word
@@ -64,23 +94,25 @@ final class KhmerSegmenter {
             while let previous = segments.last, counts[composing] == nil {
                 let merged = previous + composing
                 guard merged.unicodeScalars.count <= maxWordScalars,
-                      counts[merged] != nil
-                        || !dictionary.completions(prefix: merged,
-                                                   lang: KhmerlangDictionary.langKhmer,
-                                                   limit: 1).isEmpty else { break }
+                      counts[merged] != nil || hasWord(prefix: merged) else { break }
                 composing = merged
                 segments.removeLast()
             }
             return Split(context: segments, composing: composing)
         }
-        var segments = segment(run, allowTrailingPrefix: true)
+        var segments = segment(windowed, allowTrailingPrefix: true)
         let composing = segments.popLast() ?? ""
         return Split(context: segments, composing: composing)
     }
 
     /// Segment a completed run (used for next-word prediction context).
     func words(in run: String) -> [String] {
-        ml?.segment(run) ?? segment(run, allowTrailingPrefix: false)
+        let (windowed, truncated) = Self.window(run)
+        if var segments = ml?.segment(windowed) {
+            if truncated && segments.count > 1 { segments.removeFirst() }
+            return segments
+        }
+        return segment(windowed, allowTrailingPrefix: false)
     }
 
     // MARK: - Dynamic programme
@@ -110,10 +142,7 @@ final class KhmerSegmenter {
                 if let count = counts[candidate] {
                     relax(&dp, from: i, to: i + len, coverage: len,
                           logProb: log(Double(count) + 1) - logTotal, unknown: false)
-                } else if allowTrailingPrefix, i + len == n,
-                          !dictionary.completions(prefix: candidate,
-                                                  lang: KhmerlangDictionary.langKhmer,
-                                                  limit: 1).isEmpty {
+                } else if allowTrailingPrefix, i + len == n, hasWord(prefix: candidate) {
                     // The tail starts a longer dictionary word: treat it as the
                     // incomplete composing word (scored like a rare word, so a
                     // complete word covering the same scalars is preferred).

@@ -24,8 +24,11 @@ final class SuggestionProvider {
 
     /// Candidates for the word currently being composed: fuzzy corrections of the
     /// (possibly misspelled) word first, then prefix completions to fill in.
+    /// `isCancelled` is polled between the expensive stages so a request
+    /// superseded by a newer keystroke stops burning CPU mid-pipeline.
     func completions(for word: String, language: KeyboardLanguage,
-                     prevOne: String, prevTwo: String, isStartSentence: Bool) -> [String] {
+                     prevOne: String, prevTwo: String, isStartSentence: Bool,
+                     isCancelled: () -> Bool = { false }) -> [String] {
         guard !word.isEmpty else { return [] }
         var results: [String] = []
 
@@ -45,7 +48,9 @@ final class SuggestionProvider {
         // after up to 10 corrections (which starved them entirely).
         let corrections = corrector.correct(word: word, language: language,
                                             prevOne: prevOne, prevTwo: prevTwo,
-                                            isStartSentence: isStartSentence)
+                                            isStartSentence: isStartSentence,
+                                            isCancelled: isCancelled)
+        if isCancelled() { return [] }
         let langCode = (language == .khmer) ? KhmerlangDictionary.langKhmer : KhmerlangDictionary.langEnglish
         var prefixCompletions: [String] = []
         if langCode == KhmerlangDictionary.langKhmer || SharedStore.englishCorrectionEnabled {
@@ -57,7 +62,7 @@ final class SuggestionProvider {
         let checkerEnabled = (language == .english)
             ? SharedStore.englishCorrectionEnabled
             : Self.khmerCheckerSupported
-        if checkerEnabled {
+        if checkerEnabled && !isCancelled() {
             let langId = (language == .english) ? "en_US" : "km"
             let ns = word as NSString
             let fullRange = NSRange(location: 0, length: ns.length)

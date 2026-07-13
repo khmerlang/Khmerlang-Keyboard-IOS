@@ -30,6 +30,11 @@ final class SuggestionBarView: UIView {
     /// toggles the quick-settings strip.
     private let logoButton = UIButton(type: .system)
     private var showingSettings = false
+    /// What the stack currently displays: the candidate list, or nil when it
+    /// shows the settings strip. Lets `setSuggestions` skip rebuilding ~10
+    /// subviews (plus an Auto Layout pass) when a keystroke produced the same
+    /// candidates as the last one.
+    private var displayedSuggestions: [String]?
 
     init(theme: KeyboardTheme) {
         self.theme = theme
@@ -81,7 +86,9 @@ final class SuggestionBarView: UIView {
     /// Replace the displayed candidates. Typing closes the settings strip
     /// (mirrors the Android smartbar's setTyping behaviour).
     func setSuggestions(_ suggestions: [String]) {
+        if displayedSuggestions == suggestions { return }
         showingSettings = false
+        displayedSuggestions = suggestions
         clearStack()
 
         guard !suggestions.isEmpty else { return }
@@ -114,6 +121,7 @@ final class SuggestionBarView: UIView {
     /// Toggle chips for the Latin-input suggestion sources (the Android
     /// smartbar settings list opened from the logo button).
     private func renderSettings() {
+        displayedSuggestions = nil
         clearStack()
         // Spell check is the future premium feature; hidden when not entitled.
         if SharedStore.spellCheckEnabled && SharedStore.spellCheckConsentGranted {
