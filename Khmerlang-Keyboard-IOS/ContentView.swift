@@ -9,6 +9,7 @@
 import SwiftUI
 
 struct ContentView: View {
+    @AppStorage("appLanguage") private var appLanguage = "system"
     @State private var tryOutText: String = ""
     @State private var romanEnabled = SharedStore.romanCorrectionEnabled
     @State private var englishEnabled = SharedStore.englishCorrectionEnabled
@@ -26,6 +27,15 @@ struct ContentView: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
+                }
+
+                Section("Language") {
+                    Picker("App language", selection: $appLanguage) {
+                        Text("System").tag("system")
+                        Text("English").tag("en")
+                        Text("ខ្មែរ").tag("km")
+                    }
+                    .pickerStyle(.segmented)
                 }
 
                 Section("Enable the keyboard") {
@@ -111,7 +121,7 @@ struct ContentView: View {
         }
     }
 
-    private func stepRow(_ number: Int, _ text: String) -> some View {
+    private func stepRow(_ number: Int, _ text: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
                 .font(.subheadline).bold()
