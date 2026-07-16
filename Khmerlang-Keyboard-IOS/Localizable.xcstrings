@@ -439,6 +439,7 @@
       }
     },
     "System" : {
+      "extractionState" : "stale",
       "localizations" : {
         "km" : {
           "stringUnit" : {

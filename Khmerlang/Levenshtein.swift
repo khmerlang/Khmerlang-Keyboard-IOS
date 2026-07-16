@@ -22,7 +22,11 @@ enum Levenshtein {
     private static let neighbors: [Unicode.Scalar: Set<Unicode.Scalar>] = build([
         // QWERTY
         ("q", "wa"), ("w", "esaq"), ("e", "rdsw"), ("r", "tfde"), ("t", "ygfr"),
-        ("y", "uhgt"), ("u", "ijhy"), ("i", "okju"), ("o", "plki"), ("p", "lo"),
+        // "y"/"i" aren't QWERTY-adjacent, but they're the same cheap
+        // substitution in Khmer romanisation ("-dey" vs "-di" style endings
+        // are used interchangeably for the same vowel), so treat them as
+        // neighbors here too.
+        ("y", "uhgti"), ("u", "ijhy"), ("i", "okjuy"), ("o", "plki"), ("p", "lo"),
         ("a", "qwsz"), ("s", "wedxza"), ("d", "erfcxs"), ("f", "rtgvcd"), ("g", "tyhbvf"),
         ("h", "yujnbg"), ("j", "uikmnh"), ("k", "iolmj"), ("l", "opk"),
         ("z", "asx"), ("x", "sdcz"), ("c", "dfvx"), ("v", "fgbc"), ("b", "ghnv"),

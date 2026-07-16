@@ -9,8 +9,10 @@ import SwiftUI
 
 @main
 struct Khmerlang_Keyboard_IOSApp: App {
-    /// "system" follows the device language; "en" / "km" force the app UI language.
-    @AppStorage("appLanguage") private var appLanguage = "system"
+    /// "en" / "km" force the app UI language; defaults to Khmer. A stray
+    /// "system" value left over from an older app version still falls back
+    /// to the device locale rather than an invalid Locale identifier.
+    @AppStorage("appLanguage") private var appLanguage = "km"
 
     var body: some Scene {
         WindowGroup {

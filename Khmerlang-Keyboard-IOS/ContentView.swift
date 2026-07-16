@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @AppStorage("appLanguage") private var appLanguage = "system"
+    @AppStorage("appLanguage") private var appLanguage = "km"
     @State private var tryOutText: String = ""
     @State private var romanEnabled = SharedStore.romanCorrectionEnabled
     @State private var englishEnabled = SharedStore.englishCorrectionEnabled
@@ -31,7 +31,6 @@ struct ContentView: View {
 
                 Section("Language") {
                     Picker("App language", selection: $appLanguage) {
-                        Text("System").tag("system")
                         Text("English").tag("en")
                         Text("ខ្មែរ").tag("km")
                     }
