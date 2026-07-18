@@ -46,7 +46,7 @@ struct PrivacyPolicyView: View {
             }
 
             Section("Contact") {
-                Link(destination: URL(string: "https://www.khmerlang.com/privacy")!) {
+                Link(destination: URL(string: "https://www.khmerlang.com/ios-privacy")!) {
                     Label("Hosted privacy policy page", systemImage: "globe")
                 }
                 Link(destination: URL(string: "mailto:privacy@khmerlang.com")!) {

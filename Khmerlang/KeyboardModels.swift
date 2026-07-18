@@ -30,7 +30,11 @@ enum KeyAction: Equatable {
     case alphabet
     /// Toggle between Khmer and English layouts (the swap key).
     case modeChange
-    /// Advance to the next system keyboard (the globe key).
+    /// Open the containing Khmerlang app (the globe key). Switching to the
+    /// next system keyboard is handled by iOS itself: it overlays its own
+    /// switcher on the keyboard whenever more than one keyboard is enabled
+    /// (`UIInputViewController.needsInputModeSwitchKey`), so this button is
+    /// free to do something else.
     case nextKeyboard
     /// Insert a space.
     case space

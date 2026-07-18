@@ -55,11 +55,21 @@
 			);
 			target = D9CDBB8C300280F900B82913 /* Khmerlang */;
 		};
+		D9CDBB99300280F900B82914 /* Exceptions for "Khmerlang-Keyboard-IOS" folder in "Khmerlang-Keyboard-IOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D9CDBB7A300280D400B82913 /* Khmerlang-Keyboard-IOS */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D9CDBB7D300280D400B82913 /* Khmerlang-Keyboard-IOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D9CDBB99300280F900B82914 /* Exceptions for "Khmerlang-Keyboard-IOS" folder in "Khmerlang-Keyboard-IOS" target */,
+			);
 			path = "Khmerlang-Keyboard-IOS";
 			sourceTree = "<group>";
 		};
@@ -434,6 +444,7 @@
 				DEVELOPMENT_TEAM = BSJPU8MQ6R;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Khmerlang-Keyboard-IOS/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "ខ្មែរឡេង-Khmerlang";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -468,6 +479,7 @@
 				DEVELOPMENT_TEAM = BSJPU8MQ6R;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Khmerlang-Keyboard-IOS/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "ខ្មែរឡេង-Khmerlang";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

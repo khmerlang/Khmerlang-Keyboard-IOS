@@ -140,7 +140,7 @@ final class KeyButton: UIView {
                 }
             } else if key.action != .nextKeyboard {
                 // Commit on touch-down. The globe key stays on touch-up so the
-                // keyboard isn't switched out from under an active touch.
+                // app isn't opened out from under an active touch.
                 didCommitOnDown = true
                 delegate?.keyButton(self, didTap: key)
             }

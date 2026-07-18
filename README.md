@@ -28,8 +28,8 @@ xcodebuild -scheme Khmerlang-Keyboard-IOS -destination 'platform=iOS Simulator,n
 
 To publish at your production URL:
 
-1. Upload docs/privacy-policy.html to your website as /privacy.
-2. Verify https://www.khmerlang.com/privacy is publicly accessible without login.
+1. Upload docs/privacy-policy.html to your website as /ios-privacy.
+2. Verify https://www.khmerlang.com/ios-privacy is publicly accessible without login.
 3. Keep web content aligned with PRIVACY_POLICY.md and the in-app policy text.
 
 ## Release Checklist

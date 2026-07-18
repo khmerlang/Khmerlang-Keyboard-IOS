@@ -275,9 +275,20 @@ class KeyboardViewController: UIInputViewController {
                 }
             }
         } else if let segmenter, Self.containsKhmer(run) {
-            let split = segmenter.composingSplit(of: run)
-            word = split.composing
-            let context = split.context
+            // A roman tail glued to Khmer text (e.g. សួស្ដីbay) is itself the
+            // composing word: the Khmer segmenter maps Latin scalars to
+            // "unknown" and splits the tail unpredictably, losing its first
+            // letters. Only the Khmer part goes to the segmenter (as context).
+            let tail = Self.trailingNonKhmer(in: run)
+            let context: [String]
+            if tail.isEmpty {
+                let split = segmenter.composingSplit(of: run)
+                word = split.composing
+                context = split.context
+            } else {
+                word = tail
+                context = segmenter.words(in: String(run.dropLast(tail.count)))
+            }
             if context.count >= 2 {
                 (one, two) = (context[context.count - 2], context[context.count - 1])
             } else if context.count == 1 {
@@ -307,6 +318,17 @@ class KeyboardViewController: UIInputViewController {
     /// Whether `text` contains any scalar from the Khmer block.
     static func containsKhmer(_ text: String) -> Bool {
         text.unicodeScalars.contains { (0x1780...0x17FF).contains($0.value) }
+    }
+
+    /// The trailing characters of `text` containing no Khmer scalar (a roman
+    /// word typed directly after spaceless Khmer text).
+    static func trailingNonKhmer(in text: String) -> String {
+        var characters: [Character] = []
+        for character in text.reversed() {
+            if character.unicodeScalars.contains(where: { (0x1780...0x17FF).contains($0.value) }) { break }
+            characters.append(character)
+        }
+        return String(characters.reversed())
     }
 
     // MARK: - Precise deletion
@@ -442,7 +464,7 @@ extension KeyboardViewController: KeyButtonDelegate {
             reloadGrid()
 
         case .nextKeyboard:
-            advanceToNextInputMode()
+            openContainingApp()
         }
     }
 
@@ -452,6 +474,46 @@ extension KeyboardViewController: KeyButtonDelegate {
         if page == .shift {
             page = .normal
             reloadGrid()
+        }
+    }
+
+    /// Opens the Khmerlang app via its custom URL scheme. Tries the official
+    /// `NSExtensionContext.open` first (supported for keyboards on recent iOS),
+    /// then falls back to walking the responder chain for the host app's
+    /// `UIApplication` — the workaround for `UIApplication.shared` being
+    /// unavailable in extensions. UIKit hard-blocks the deprecated `openURL:`
+    /// selector, so the fallback must go through
+    /// `openURL:options:completionHandler:`.
+    private func openContainingApp() {
+        guard hasFullAccess, let url = URL(string: "khmerlang://") else { return }
+        if let context = extensionContext {
+            context.open(url) { [weak self] success in
+                if !success {
+                    DispatchQueue.main.async { self?.openViaHostApplication(url) }
+                }
+            }
+        } else {
+            openViaHostApplication(url)
+        }
+    }
+
+    private func openViaHostApplication(_ url: URL) {
+        let selector = sel_registerName("openURL:options:completionHandler:")
+        var responder: UIResponder? = self
+        while let current = responder {
+            if current.responds(to: selector) {
+                // The options argument differs by receiver: UIApplication takes
+                // an NSDictionary, but UIWindowScene (hit first in the chain)
+                // takes a UIScene.OpenExternalURLOptions object — handing the
+                // scene a dictionary crashes. Its options are nullable, so
+                // pass nil for anything that isn't the application.
+                typealias OpenURLMethod = @convention(c) (NSObject, Selector, NSURL, AnyObject?, Any?) -> Void
+                let open = unsafeBitCast(current.method(for: selector), to: OpenURLMethod.self)
+                let options: AnyObject? = (current is UIApplication) ? NSDictionary() : nil
+                open(current, selector, url as NSURL, options, nil)
+                return
+            }
+            responder = current.next
         }
     }
 }

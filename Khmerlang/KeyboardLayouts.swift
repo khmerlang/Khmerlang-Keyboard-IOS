@@ -37,7 +37,7 @@ enum KeyboardLayouts {
             isSpecial: true, isRepeatable: true)
     }
     private static var modeChangeKey: Key { fn(.modeChange, icon: "arrow.left.arrow.right", w: 10) }
-    private static var globeKey: Key { fn(.nextKeyboard, icon: "globe", w: 10) }
+    private static var globeKey: Key { fn(.nextKeyboard, icon: "gearshape", w: 10) }
     private static var returnKey: Key { fn(.enter, icon: "return", w: 15) }
 
     private static func spaceKey(_ language: KeyboardLanguage) -> Key {
