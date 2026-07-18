@@ -220,7 +220,10 @@ class KeyboardViewController: UIInputViewController {
             DispatchQueue.main.async {
                 guard self.isCurrent(generation) else { return }
                 self.suggestionsAreNextWords = areNextWords
-                self.suggestionBar.setSuggestions(suggestions)
+                // Mark the candidate a space press would auto-commit, so the
+                // user can see what they'd get before committing.
+                self.suggestionBar.setSuggestions(suggestions,
+                                                  highlighting: self.autoCommitTarget(in: suggestions))
             }
         }
     }
@@ -417,9 +420,11 @@ extension KeyboardViewController: KeyButtonDelegate {
             updateSuggestions()
 
         case .space:
-            proxy.insertText(" ")
+            if !autoCommitRomanIfNeeded() {
+                proxy.insertText(" ")
+                updateSuggestions()
+            }
             revertShiftIfNeeded()
-            updateSuggestions()
 
         case .enter:
             proxy.insertText("\n")
@@ -595,6 +600,40 @@ extension KeyboardViewController: SuggestionBarViewDelegate {
     }
 
     func suggestionBar(_ bar: SuggestionBarView, didSelect suggestion: String) {
+        commit(suggestion: suggestion)
+    }
+
+    /// Pinyin-style commit (the "Space → ខ្មែរ" option): pressing space while a
+    /// roman word is being composed replaces it with the first Khmer candidate
+    /// shown in the bar, and the space is consumed — like committing a pinyin
+    /// candidate on a Chinese keyboard. Returns false when the mode is off or
+    /// nothing qualifies, in which case the caller inserts a normal space.
+    private func autoCommitRomanIfNeeded() -> Bool {
+        guard let candidate = autoCommitTarget(in: suggestionBar?.currentSuggestions ?? []) else {
+            return false
+        }
+        commit(suggestion: candidate)
+        return true
+    }
+
+    /// The candidate a space press would auto-commit, or nil when the mode is
+    /// off or nothing qualifies. Shared by the commit itself and the bar's
+    /// highlight, so the marked word is always the one space inserts.
+    private func autoCommitTarget(in suggestions: [String]) -> String? {
+        guard SharedStore.romanAutoCommitEnabled && SharedStore.romanCorrectionEnabled,
+              !suggestionsAreNextWords,
+              let candidate = suggestions.first(where: { Self.containsKhmer($0) })
+        else { return nil }
+        // Only convert a purely roman composing word; Khmer text under the
+        // cursor (or digits/empty) gets an ordinary space.
+        let word = composingContext(before: textDocumentProxy.documentContextBeforeInput ?? "").word
+        guard !word.isEmpty, !Self.containsKhmer(word), word.contains(where: \.isLetter) else { return nil }
+        return candidate
+    }
+
+    /// Apply a picked candidate to the document (shared by bar taps and the
+    /// space auto-commit).
+    private func commit(suggestion: String) {
         // Replace the word currently being composed (the trailing segment of a
         // spaceless Khmer run, or the whitespace-delimited word) with the
         // chosen candidate. Khmer is written without spaces, so only Latin

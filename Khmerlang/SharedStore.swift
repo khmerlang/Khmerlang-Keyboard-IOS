@@ -48,6 +48,15 @@ enum SharedStore {
         set { defaults?.set(newValue, forKey: englishCorrectionKey) }
     }
 
+    /// Pinyin-style commit: pressing space while typing a roman word replaces
+    /// it with the top Khmer candidate instead of inserting a space
+    /// (default off — it hijacks space for ordinary English typing).
+    static var romanAutoCommitEnabled: Bool {
+        get { defaults?.object(forKey: romanAutoCommitKey) as? Bool ?? false }
+        set { defaults?.set(newValue, forKey: romanAutoCommitKey) }
+    }
+    private static let romanAutoCommitKey = "key_rm_auto_commit_mode"
+
     /// User-defined romanisation → Khmer pairs, oldest first.
     static var customMappings: [CustomMapping] {
         get {

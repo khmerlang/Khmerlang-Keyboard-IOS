@@ -12,6 +12,7 @@ struct ContentView: View {
     @AppStorage("appLanguage") private var appLanguage = "km"
     @State private var tryOutText: String = ""
     @State private var romanEnabled = SharedStore.romanCorrectionEnabled
+    @State private var romanAutoCommit = SharedStore.romanAutoCommitEnabled
     @State private var englishEnabled = SharedStore.englishCorrectionEnabled
     @State private var cloudSpellCheckEnabled = SharedStore.spellCheckEnabled
     @State private var cloudSpellCheckConsent = SharedStore.spellCheckConsentGranted
@@ -53,6 +54,11 @@ struct ContentView: View {
                         .onChange(of: romanEnabled) { value in
                             SharedStore.romanCorrectionEnabled = value
                         }
+                    Toggle("Space converts to Khmer", isOn: $romanAutoCommit)
+                        .disabled(!romanEnabled)
+                        .onChange(of: romanAutoCommit) { value in
+                            SharedStore.romanAutoCommitEnabled = value
+                        }
                     Toggle("English suggestions", isOn: $englishEnabled)
                         .onChange(of: englishEnabled) { value in
                             SharedStore.englishCorrectionEnabled = value
@@ -65,7 +71,7 @@ struct ContentView: View {
                 } header: {
                     Text("Suggestions")
                 } footer: {
-                    Text("Toggles control what appears when typing with Latin letters. Changes apply the next time the keyboard opens.")
+                    Text("Toggles control what appears when typing with Latin letters. “Space converts to Khmer” works like a pinyin keyboard: pressing space replaces the roman word you typed with the first Khmer suggestion. Changes apply the next time the keyboard opens.")
                 }
 
                 Section {

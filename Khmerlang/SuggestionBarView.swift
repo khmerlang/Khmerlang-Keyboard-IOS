@@ -35,6 +35,9 @@ final class SuggestionBarView: UIView {
     /// subviews (plus an Auto Layout pass) when a keystroke produced the same
     /// candidates as the last one.
     private var displayedSuggestions: [String]?
+    /// The candidate the space key would auto-commit (pinyin-style mode);
+    /// rendered tinted + underlined so the user knows what space will insert.
+    private var displayedHighlight: String?
 
     init(theme: KeyboardTheme) {
         self.theme = theme
@@ -83,12 +86,19 @@ final class SuggestionBarView: UIView {
         ])
     }
 
+    /// The candidates currently on screen (empty while the settings strip is
+    /// shown). Read by the controller for the space-commits-Khmer mode, so a
+    /// space press converts exactly what the user sees.
+    var currentSuggestions: [String] { displayedSuggestions ?? [] }
+
     /// Replace the displayed candidates. Typing closes the settings strip
-    /// (mirrors the Android smartbar's setTyping behaviour).
-    func setSuggestions(_ suggestions: [String]) {
-        if displayedSuggestions == suggestions { return }
+    /// (mirrors the Android smartbar's setTyping behaviour). `highlighted`
+    /// marks the candidate the space key would auto-commit.
+    func setSuggestions(_ suggestions: [String], highlighting highlighted: String? = nil) {
+        if displayedSuggestions == suggestions && displayedHighlight == highlighted { return }
         showingSettings = false
         displayedSuggestions = suggestions
+        displayedHighlight = highlighted
         clearStack()
 
         guard !suggestions.isEmpty else { return }
@@ -97,7 +107,7 @@ final class SuggestionBarView: UIView {
             if index > 0 {
                 stack.addArrangedSubview(makeSeparator())
             }
-            stack.addArrangedSubview(makeButton(suggestion))
+            stack.addArrangedSubview(makeButton(suggestion, highlighted: suggestion == highlighted))
         }
     }
 
@@ -122,6 +132,7 @@ final class SuggestionBarView: UIView {
     /// smartbar settings list opened from the logo button).
     private func renderSettings() {
         displayedSuggestions = nil
+        displayedHighlight = nil
         clearStack()
         // Spell check is the future premium feature; hidden when not entitled.
         if SharedStore.spellCheckEnabled && SharedStore.spellCheckConsentGranted {
@@ -141,6 +152,10 @@ final class SuggestionBarView: UIView {
         }
         stack.addArrangedSubview(makeSettingChip("Roman → ខ្មែរ", isOn: SharedStore.romanCorrectionEnabled) {
             SharedStore.romanCorrectionEnabled.toggle()
+        })
+        stack.addArrangedSubview(makeSeparator())
+        stack.addArrangedSubview(makeSettingChip("Space → ខ្មែរ", isOn: SharedStore.romanAutoCommitEnabled) {
+            SharedStore.romanAutoCommitEnabled.toggle()
         })
         stack.addArrangedSubview(makeSeparator())
         stack.addArrangedSubview(makeSettingChip("English", isOn: SharedStore.englishCorrectionEnabled) {
@@ -163,11 +178,21 @@ final class SuggestionBarView: UIView {
 
     // MARK: - Subview factories
 
-    private func makeButton(_ title: String) -> UIButton {
+    private func makeButton(_ title: String, highlighted: Bool = false) -> UIButton {
         let button = UIButton(type: .system)
+        // The plain title stays set even in the highlighted case: display uses
+        // the attributed title, but candidateTapped reads title(for:).
         button.setTitle(title, for: .normal)
         button.setTitleColor(theme.keyText, for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 18)
+        if highlighted {
+            button.setAttributedTitle(NSAttributedString(string: title, attributes: [
+                .font: UIFont.systemFont(ofSize: 18, weight: .semibold),
+                .foregroundColor: UIColor.systemBlue,
+                .underlineStyle: NSUnderlineStyle.single.rawValue,
+                .underlineColor: UIColor.systemBlue
+            ]), for: .normal)
+        }
         button.titleLabel?.adjustsFontSizeToFitWidth = true
         button.titleLabel?.minimumScaleFactor = 0.7
         button.contentEdgeInsets = UIEdgeInsets(top: 4, left: 16, bottom: 4, right: 16)
