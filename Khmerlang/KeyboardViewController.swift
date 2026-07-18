@@ -484,6 +484,12 @@ extension KeyboardViewController: KeyButtonDelegate {
     /// unavailable in extensions. UIKit hard-blocks the deprecated `openURL:`
     /// selector, so the fallback must go through
     /// `openURL:options:completionHandler:`.
+    ///
+    /// ⚠️ App Review risk: the responder-chain fallback reaches the host app's
+    /// `UIApplication` from an extension, a pattern App Review has rejected in
+    /// other keyboards. If a rejection cites it, delete
+    /// `openViaHostApplication(_:)` and both calls to it below — the official
+    /// `extensionContext.open` path stays and the button degrades gracefully.
     private func openContainingApp() {
         guard hasFullAccess, let url = URL(string: "khmerlang://") else { return }
         if let context = extensionContext {

@@ -40,3 +40,11 @@ To publish at your production URL:
 - Run release build and unit tests in CI.
 - Bump MARKETING_VERSION and CURRENT_PROJECT_VERSION.
 - Validate app + keyboard behavior on at least one older iOS version and one latest iOS version.
+- If App Review objects to the "open containing app" behavior, remove the
+  responder-chain fallback (`openViaHostApplication` in
+  Khmerlang/KeyboardViewController.swift) and resubmit; the official
+  `extensionContext.open` path remains.
+
+## License
+
+This project is licensed under the GNU General Public License v3.0 — see [LICENSE](LICENSE).
