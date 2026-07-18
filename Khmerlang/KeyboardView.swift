@@ -31,10 +31,26 @@ final class KeyboardView: UIView {
     /// recreating ~30 buttons on the main thread mid-typing.
     private var cachedRows: [String: [[KeyButton]]] = [:]
 
+    /// Buttons from a replaced grid whose touch was still in progress when the
+    /// page switched (fast rollover typing, or a long-press being held). They
+    /// stay in the hierarchy — removing a view mid-touch cancels its touch and
+    /// drops the key — and are removed when their touch finishes.
+    private var retiredButtons: [KeyButton] = []
+
     /// Show a layout. Pass a `cacheKey` unique to the grid's content
     /// (language + page + return-key label) to reuse previously built buttons.
     func setGrid(_ grid: KeyboardGrid, cacheKey: String? = nil) {
-        buttonRows.forEach { $0.forEach { $0.removeFromSuperview() } }
+        buttonRows.forEach { row in
+            row.forEach { button in
+                if button.isTracking {
+                    if !retiredButtons.contains(where: { $0 === button }) {
+                        retiredButtons.append(button)
+                    }
+                } else {
+                    button.removeFromSuperview()
+                }
+            }
+        }
         if let cacheKey, let cached = cachedRows[cacheKey] {
             buttonRows = cached
             cached.forEach { $0.forEach { addSubview($0) } }
@@ -51,7 +67,50 @@ final class KeyboardView: UIView {
                 cachedRows[cacheKey] = buttonRows
             }
         }
+        // Switching back to a cached page mid-touch can re-adopt a retired
+        // button; it's part of the live grid again.
+        retiredButtons.removeAll { button in
+            buttonRows.contains { row in row.contains { $0 === button } }
+        }
         setNeedsLayout()
+    }
+
+    /// Called by a KeyButton when its touch ends or is cancelled; removes it
+    /// if a page switch retired it while the touch was in progress.
+    func keyButtonDidFinishTouch(_ button: KeyButton) {
+        guard let index = retiredButtons.firstIndex(where: { $0 === button }) else { return }
+        retiredButtons.remove(at: index)
+        button.removeFromSuperview()
+    }
+
+    /// Touches landing in the gaps between keys (or the side margins of a
+    /// centered row) hit-test to this view and would be silently dropped —
+    /// a major cause of missed presses during fast typing. Route them to the
+    /// nearest key instead, so the whole keyboard surface is tappable like
+    /// the system keyboard.
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let view = super.hitTest(point, with: event)
+        guard view === self, bounds.contains(point) else { return view }
+        return nearestButton(to: point) ?? view
+    }
+
+    private func nearestButton(to point: CGPoint) -> KeyButton? {
+        var best: KeyButton?
+        var bestDistance = CGFloat.greatestFiniteMagnitude
+        for row in buttonRows {
+            for button in row {
+                // Squared distance from the point to the button's frame
+                // (zero when inside).
+                let dx = max(button.frame.minX - point.x, 0, point.x - button.frame.maxX)
+                let dy = max(button.frame.minY - point.y, 0, point.y - button.frame.maxY)
+                let distance = dx * dx + dy * dy
+                if distance < bestDistance {
+                    bestDistance = distance
+                    best = button
+                }
+            }
+        }
+        return best
     }
 
     override func layoutSubviews() {

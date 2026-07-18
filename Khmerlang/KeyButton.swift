@@ -6,6 +6,11 @@
 //  character keys, long-press insertion of the sub-label, and auto-repeat for
 //  repeatable keys (backspace).
 //
+//  Keys without a long-press variant commit on touch-DOWN like the system
+//  keyboard: firing on touch-up added a full finger-contact of latency and
+//  silently dropped the key whenever the touch was cancelled (page reloads,
+//  system gestures) — the main cause of missed presses during fast typing.
+//
 
 import UIKit
 
@@ -28,6 +33,11 @@ final class KeyButton: UIView {
     private var repeatDelayTimer: Timer?
     private var repeatTimer: Timer?
     private var didFireLongPress = false
+    private var didCommitOnDown = false
+
+    /// True while a touch is in progress on this key. KeyboardView keeps
+    /// tracking buttons alive across page switches so the touch isn't cancelled.
+    private(set) var isTracking = false
 
     init(key: Key, theme: KeyboardTheme) {
         self.key = key
@@ -102,6 +112,8 @@ final class KeyButton: UIView {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         didFireLongPress = false
+        didCommitOnDown = false
+        isTracking = true
         setHighlighted(true)
 
         if key.isRepeatable {
@@ -117,6 +129,8 @@ final class KeyButton: UIView {
         } else {
             showPreview()
             if key.subLabel != nil {
+                // Long-press keys must wait for touch-up to know which of the
+                // two characters the user meant.
                 longPressTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
                     guard let self else { return }
                     self.didFireLongPress = true
@@ -124,12 +138,17 @@ final class KeyButton: UIView {
                     self.delegate?.keyButton(self, didLongPress: self.key)
                     self.setHighlighted(false)
                 }
+            } else if key.action != .nextKeyboard {
+                // Commit on touch-down. The globe key stays on touch-up so the
+                // keyboard isn't switched out from under an active touch.
+                didCommitOnDown = true
+                delegate?.keyButton(self, didTap: key)
             }
         }
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        finishTouch(deliverTap: !didFireLongPress && !key.isRepeatable)
+        finishTouch(deliverTap: !didFireLongPress && !didCommitOnDown && !key.isRepeatable)
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -137,6 +156,7 @@ final class KeyButton: UIView {
     }
 
     private func finishTouch(deliverTap: Bool) {
+        isTracking = false
         cancelTimers()
         hidePreview()
         setHighlighted(false)
@@ -144,6 +164,9 @@ final class KeyButton: UIView {
             delegate?.keyButton(self, didTap: key)
         }
         didFireLongPress = false
+        didCommitOnDown = false
+        // If a page switch retired this button mid-touch, remove it now.
+        (superview as? KeyboardView)?.keyButtonDidFinishTouch(self)
     }
 
     private func cancelTimers() {
