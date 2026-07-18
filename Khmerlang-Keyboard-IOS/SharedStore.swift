@@ -26,7 +26,7 @@ enum SharedStore {
 
     /// App Group shared by the container app and the keyboard extension
     /// (must match the App Groups capability on BOTH targets).
-    static let appGroupID = "group.com.khmerlang.keyboard"
+    static let appGroupID = "group.com.nexoft.khmerlang-keyboard"
 
     static let defaults = UserDefaults(suiteName: appGroupID)
 
