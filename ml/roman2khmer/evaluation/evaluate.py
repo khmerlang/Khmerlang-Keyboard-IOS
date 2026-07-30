@@ -5,6 +5,11 @@ examples, and bucketed by how much of the word was typed -- the accuracy
 curve that actually predicts suggestion-bar UX quality. Also dumps the
 worst misses for manual review.
 
+Every accuracy number is also reported frequency-weighted (each row
+weighted by its word's real sqlite `count`), alongside the plain uniform
+number -- since real-world impact is dominated by how often a word is
+actually typed, not by giving every held-out example equal say.
+
 Usage: python -m evaluation.evaluate   (run from ml/roman2khmer/)
 """
 
@@ -24,6 +29,24 @@ def topk_hit(probs, labels, k):
     return np.array([label in row for label, row in zip(labels, topk)])
 
 
+def weighted_accuracy(hit_mask, weights):
+    return float(np.average(hit_mask, weights=weights))
+
+
+def fmt(hit1, hit3, hit5, mask, counts):
+    # len(...[mask]), not mask.sum(): mask may be a boolean mask or an
+    # integer index array (e.g. the typed-fraction buckets below), and
+    # summing an index array's values is not the same as counting them.
+    w = counts[mask]
+    n = len(w)
+    return (
+        f"n={n:5d}  "
+        f"top-1={hit1[mask].mean():.4f} (fw={weighted_accuracy(hit1[mask], w):.4f})  "
+        f"top-3={hit3[mask].mean():.4f} (fw={weighted_accuracy(hit3[mask], w):.4f})  "
+        f"top-5={hit5[mask].mean():.4f} (fw={weighted_accuracy(hit5[mask], w):.4f})"
+    )
+
+
 def main():
     char_vocab = load_char_vocab()
     vocab = load_vocab()
@@ -36,27 +59,25 @@ def main():
     hit1 = topk_hit(probs, y_val, 1)
     hit3 = topk_hit(probs, y_val, 3)
     hit5 = topk_hit(probs, y_val, 5)
+    counts = np.array([r["count"] for r in rows], dtype=np.float64)
 
     print(f"val examples: {len(rows)}")
-    print(f"top-1: {hit1.mean():.4f}  top-3: {hit3.mean():.4f}  top-5: {hit5.mean():.4f}")
+    all_mask = np.ones(len(rows), dtype=bool)
+    print(f"top-1/3/5:  {fmt(hit1, hit3, hit5, all_mask, counts)}")
+    print("(fw = frequency-weighted -- weighted by each row's real sqlite word count; "
+          "this is the number that predicts real-world auto-commit impact)")
 
     is_full = np.array([r["is_full"] for r in rows])
     for label, mask in [("full spelling", is_full), ("prefix", ~is_full)]:
         if mask.sum() == 0:
             continue
-        print(
-            f"  {label:14s} n={mask.sum():5d}  "
-            f"top-1={hit1[mask].mean():.4f}  top-3={hit3[mask].mean():.4f}  top-5={hit5[mask].mean():.4f}"
-        )
+        print(f"  {label:14s} {fmt(hit1, hit3, hit5, mask, counts)}")
 
     is_typo = np.array([r["is_typo"] for r in rows])
     for label, mask in [("clean", ~is_typo), ("typo'd", is_typo)]:
         if mask.sum() == 0:
             continue
-        print(
-            f"  {label:14s} n={mask.sum():5d}  "
-            f"top-1={hit1[mask].mean():.4f}  top-3={hit3[mask].mean():.4f}  top-5={hit5[mask].mean():.4f}"
-        )
+        print(f"  {label:14s} {fmt(hit1, hit3, hit5, mask, counts)}")
 
     context_kind = np.array([
         "none" if r["prev"] == config.CONTEXT_UNK else
@@ -69,10 +90,7 @@ def main():
         mask = context_kind == kind
         if mask.sum() == 0:
             continue
-        print(
-            f"    {kind:14s} n={mask.sum():5d}  "
-            f"top-1={hit1[mask].mean():.4f}  top-3={hit3[mask].mean():.4f}  top-5={hit5[mask].mean():.4f}"
-        )
+        print(f"    {kind:14s} {fmt(hit1, hit3, hit5, mask, counts)}")
 
     # Bucket prefix examples by how much of the word was typed.
     prefix_idx = np.where(~is_full)[0]
@@ -87,10 +105,7 @@ def main():
             sel = prefix_idx[(typed_fraction >= lo) & (typed_fraction <= hi)]
             if len(sel) == 0:
                 continue
-            print(
-                f"    [{lo:.2f},{hi:.2f}] n={len(sel):5d}  "
-                f"top-1={hit1[sel].mean():.4f}  top-3={hit3[sel].mean():.4f}  top-5={hit5[sel].mean():.4f}"
-            )
+            print(f"    [{lo:.2f},{hi:.2f}] {fmt(hit1, hit3, hit5, sel, counts)}")
 
     # Worst misses.
     print("\nworst misses (top-1 wrong), sample:")

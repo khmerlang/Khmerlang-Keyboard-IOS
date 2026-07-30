@@ -18,7 +18,6 @@ Usage: python -m data.export_dataset   (run from ml/roman2khmer/)
 import json
 import math
 import random
-import re
 import sqlite3
 import sys
 from collections import defaultdict
@@ -27,8 +26,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config
 from data.typo import apply_typo
+from comparison.shortcut import build_shortcut_map
 
-ROMAN_RE = re.compile(r"^[a-z]+$")
+ROMAN_RE = config.ROMAN_RE
 
 
 def load_words(conn):
@@ -194,6 +194,43 @@ def build_oversampled_train(train_base_by_word):
     return rows
 
 
+def fully_ambiguous_words(vocab_set):
+    """Words in vocab_set with no unambiguous romanization -- i.e. every one
+    of their known spellings is shared with some other Khmer word, so the
+    exact-match shortcut (comparison/shortcut.py) can never resolve them and
+    they depend entirely on the model. Reused by build_oversampled_train_v4
+    to give this specific, harder population extra training exposure."""
+    reachable = set(build_shortcut_map().values())
+    return {word for word in vocab_set if word not in reachable}
+
+
+def oversample_factor_v4(count, is_fully_ambiguous, cap=config.OVERSAMPLE_MAX_FACTOR):
+    """Like oversample_factor, but fully-ambiguous words (see above) get an
+    extra AMBIGUOUS_OVERSAMPLE_BONUS multiplier, capped at
+    cap * AMBIGUOUS_OVERSAMPLE_BONUS -- everything else is unchanged from
+    v3, so this only reallocates exposure toward the harder subset rather
+    than inflating the dataset uniformly."""
+    factor = oversample_factor(count, cap=cap)
+    if is_fully_ambiguous:
+        factor = min(factor * config.AMBIGUOUS_OVERSAMPLE_BONUS, cap * config.AMBIGUOUS_OVERSAMPLE_BONUS)
+    return factor
+
+
+def build_oversampled_train_v4(train_base_by_word, ambiguous_words):
+    """v4 train set: like build_oversampled_train, but using
+    oversample_factor_v4 so fully-ambiguous words get extra independently-
+    augmented copies. Uses its own rng stream, separate from v3's and
+    build_dataset()'s."""
+    rng = random.Random(config.VAL_SEED + 4)
+    rows = []
+    for word, label, count, context_pool, train_base in train_base_by_word:
+        factor = oversample_factor_v4(count, word in ambiguous_words)
+        for _ in range(factor):
+            for text, is_full in train_base:
+                rows.extend(augment(text, is_full, word, label, count, context_pool, rng))
+    return rows
+
+
 def write_jsonl(path, rows):
     with open(path, "w", encoding="utf-8") as f:
         for row in rows:
@@ -215,9 +252,13 @@ def main():
     train_rows, val_rows, train_base_by_word = build_dataset(words, context_by_word)
     train_v3_rows = build_oversampled_train(train_base_by_word)
 
+    ambiguous_words = fully_ambiguous_words(vocab_set)
+    train_v4_rows = build_oversampled_train_v4(train_base_by_word, ambiguous_words)
+
     write_jsonl(config.TRAIN_PATH, train_rows)
     write_jsonl(config.VAL_PATH, val_rows)
     write_jsonl(config.TRAIN_V3_PATH, train_v3_rows)
+    write_jsonl(config.TRAIN_V4_PATH, train_v4_rows)
 
     with open(config.VOCAB_PATH, "w", encoding="utf-8") as f:
         json.dump(vocab, f, ensure_ascii=False, indent=2)
@@ -241,6 +282,8 @@ def main():
     print(f"train rows: {len(train_rows)}")
     print(f"val rows:   {len(val_rows)}")
     print(f"train_v3 (oversampled) rows: {len(train_v3_rows)}")
+    print(f"fully-ambiguous words (no unambiguous romanization): {len(ambiguous_words)}/{len(vocab)}")
+    print(f"train_v4 (ambiguous-focused oversampled) rows: {len(train_v4_rows)}")
 
 
 if __name__ == "__main__":

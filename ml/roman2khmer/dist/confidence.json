@@ -1,0 +1,21 @@
+{
+  "description": "Recommended ML top-1 confidence thresholds for words NOT resolved by shortcut.json, measured on held-out val.jsonl (v3 model, is_full rows only). Not yet consumed by the iOS/Android apps -- for future auto-commit integration. 'threshold' is the softmax top-1 probability cutoff; 'weighted_coverage' is the frequency-weighted fraction of the ML-fallback population that clears it.",
+  "fallback_population_size": 2536,
+  "recommendations": {
+    "0.95": {
+      "threshold": 1.0,
+      "coverage": 0.044558359621451105,
+      "weighted_coverage": 0.007342544533064256
+    },
+    "0.97": {
+      "threshold": 1.0,
+      "coverage": 0.044558359621451105,
+      "weighted_coverage": 0.007342544533064256
+    },
+    "0.99": {
+      "threshold": 1.0,
+      "coverage": 0.044558359621451105,
+      "weighted_coverage": 0.007342544533064256
+    }
+  }
+}

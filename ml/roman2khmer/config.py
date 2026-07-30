@@ -4,10 +4,18 @@ Every stage (data export, training, evaluation, conversion) imports from
 here so they can't silently drift out of sync with each other.
 """
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 SQLITE_PATH = ROOT.parent.parent / "Khmerlang" / "khmerlang.sqlite"
+
+# Shared by data/export_dataset.py (filtering romanized variants) and
+# comparison/shortcut.py (filtering shortcut-map keys) -- lives here, not in
+# either module, so shortcut.py doesn't need to import data/export_dataset.py
+# (data/export_dataset.py's v4 oversampling imports comparison/shortcut.py,
+# which would otherwise be circular).
+ROMAN_RE = re.compile(r"^[a-z]+$")
 
 ARTIFACTS_DIR = ROOT / "artifacts"
 DATASET_DIR = ARTIFACTS_DIR / "dataset"
@@ -31,7 +39,25 @@ KERAS_MODEL_V3_PATH = MODEL_DIR / "roman2khmer_v3.keras"
 HISTORY_V3_PATH = MODEL_DIR / "training_history_v3.csv"
 TRAIN_V3_PATH = DATASET_DIR / "train_v3.jsonl"
 OVERSAMPLE_MAX_FACTOR = 6   # train-example duplication cap for high-count words
-SHORTCUT_TOP_N = 500        # exact-match shortcut covers this many highest-count words
+SHORTCUT_TOP_N = 500        # historical comparison cutoff (see comparison/compare_all.py);
+                             # the shipped shortcut map itself now covers every unambiguous
+                             # romanization, not just the top-N words -- see comparison/shortcut.py
+
+# Confidence calibration (evaluation/calibrate_confidence.py): candidate
+# frequency-weighted-precision bars to report an ML-fallback auto-commit
+# threshold for, once a word isn't resolved by the exact-match shortcut.
+CONFIDENCE_TARGET_PRECISIONS = [0.95, 0.97, 0.99]
+CONFIDENCE_CALIBRATION_PATH = MODEL_DIR / "confidence_calibration.json"
+
+# v4 experiment: like v3, but gives extra oversampling to words with no
+# unambiguous romanization (see comparison/shortcut.py) -- the only
+# population left for the model to earn its keep on once the shortcut
+# handles everything else. See data/export_dataset.py's
+# build_oversampled_train_v4 / oversample_factor_v4.
+KERAS_MODEL_V4_PATH = MODEL_DIR / "roman2khmer_v4.keras"
+HISTORY_V4_PATH = MODEL_DIR / "training_history_v4.csv"
+TRAIN_V4_PATH = DATASET_DIR / "train_v4.jsonl"
+AMBIGUOUS_OVERSAMPLE_BONUS = 2   # extra multiplier on oversample_factor for fully-ambiguous words
 
 # Data export
 MIN_WORD_COUNT = 5          # vocab filter: keep Khmer unigrams with count >= this

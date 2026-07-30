@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import tensorflow as tf; print\\(tf.__version__\\)\")",
+      "Bash(python3 -c \"import coremltools; print\\(coremltools.__version__\\)\")",
+      "Bash(wc -l Khmerlang/../../../Khmerlang/khmerlang.sqlite 2>/dev/null; ls -la ../../Khmerlang/khmerlang.sqlite)",
+      "Read(//home/rathanak/MyRubyOnRails/khmerlang/Khmerlang-Keyboard-IOS/Khmerlang/**)",
+      "Bash(python3 -m data.export_dataset)",
+      "Bash(python3 -c \"import sys; print\\(sys.path[:3]\\)\")",
+      "Bash(python3 -c \"import data; print\\(data.__file__ if hasattr\\(data,'__file__'\\) else data.__path__\\)\")",
+      "Bash(python3 -c \"import data; print\\(data.__file__\\)\")",
+      "Bash(python3 -m training.train)",
+      "Bash(python3 -m training.train_v3)",
+      "Bash(python3 -c \"import tensorflow as tf; print\\('GPUs:', tf.config.list_physical_devices\\('GPU'\\)\\)\")",
+      "Bash(nvidia-smi)",
+      "Bash(lspci)",
+      "Bash(python3 -m pip list)",
+      "Bash(conda env *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -m comparison.compare_all)",
+      "Bash(python3 -m evaluation.evaluate)",
+      "Bash(python3 -m evaluation.calibrate_confidence)",
+      "Bash(pip install *)",
+      "Bash(python3 -c \"import weasyprint\")",
+      "Bash(fc-list)",
+      "Bash(fc-list :lang=km)",
+      "Bash(google-chrome --headless --disable-gpu --no-sandbox --window-size=1000,1400 --screenshot=report_preview.png \"file:///home/rathanak/MyRubyOnRails/khmerlang/Khmerlang-Keyboard-IOS/ml/roman2khmer/reports/2026-07-30-deterministic-shortcut-experiment.html\")",
+      "Bash(google-chrome --headless --disable-gpu --no-sandbox --window-size=1000,6200 --screenshot=report_full.png \"file:///home/rathanak/MyRubyOnRails/khmerlang/Khmerlang-Keyboard-IOS/ml/roman2khmer/reports/2026-07-30-deterministic-shortcut-experiment.html\")",
+      "Bash(python3 -c \"from PIL import Image; im=Image.open\\('report_full.png'\\); print\\(im.size\\)\")",
+      "Bash(google-chrome --headless --disable-gpu --no-sandbox --window-size=1000,6200 --screenshot=report_full2.png \"file:///home/rathanak/MyRubyOnRails/khmerlang/Khmerlang-Keyboard-IOS/ml/roman2khmer/reports/2026-07-30-deterministic-shortcut-experiment.html\")",
+      "Bash(google-chrome --headless --disable-gpu --no-sandbox --window-size=1000,1000 --dump-dom \"file:///home/rathanak/MyRubyOnRails/khmerlang/Khmerlang-Keyboard-IOS/ml/roman2khmer/reports/2026-07-30-deterministic-shortcut-experiment.html\")",
+      "Bash(google-chrome --headless --disable-gpu --no-sandbox --force-dark-mode --enable-features=WebContentsForceDark --window-size=1000,1400 --screenshot=dark_preview.png \"file:///home/rathanak/MyRubyOnRails/khmerlang/Khmerlang-Keyboard-IOS/ml/roman2khmer/reports/2026-07-30-deterministic-shortcut-experiment.html\")",
+      "Bash(google-chrome --version)",
+      "Bash(google-chrome --headless --disable-gpu --no-sandbox --blink-settings=preferredColorScheme=2 --window-size=1000,1400 --screenshot=dark_preview2.png \"file:///home/rathanak/MyRubyOnRails/khmerlang/Khmerlang-Keyboard-IOS/ml/roman2khmer/reports/2026-07-30-deterministic-shortcut-experiment.html\")",
+      "Bash(google-chrome --headless --disable-gpu --no-sandbox --print-to-pdf=\"2026-07-30-deterministic-shortcut-experiment.pdf\" --print-to-pdf-no-header --no-pdf-header-footer \"file:///home/rathanak/MyRubyOnRails/khmerlang/Khmerlang-Keyboard-IOS/ml/roman2khmer/reports/2026-07-30-deterministic-shortcut-experiment.html\")",
+      "Bash(pdfinfo 2026-07-30-deterministic-shortcut-experiment.pdf)",
+      "Bash(pdftoppm -png -r 100 /home/rathanak/MyRubyOnRails/khmerlang/Khmerlang-Keyboard-IOS/ml/roman2khmer/reports/2026-07-30-deterministic-shortcut-experiment.pdf pdfpage)"
+    ]
+  }
+}
