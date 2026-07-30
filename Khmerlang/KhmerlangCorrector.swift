@@ -7,9 +7,11 @@
 //  and, for a possibly-misspelled word, returns dictionary words within a
 //  length-based edit-distance tolerance, re-ranked by bi-/tri-gram context.
 //
-//  Also builds the roman→Khmer tree (Android's bkRM) from the romanisations in
-//  the unigram `other` column. Until the trees are ready, `correct` falls back
-//  to an exact roman-prefix lookup so the bar is never silently empty.
+//  Roman→Khmer suggestions come from Roman2KhmerModel (exact-match shortcut +
+//  CoreML model). The roman BK-tree (Android's bkRM, built from the unigram
+//  `other` column) remains as a fallback for when the model resources are
+//  missing. Until the trees are ready, `correct` falls back to an exact
+//  roman-prefix lookup so the bar is never silently empty.
 //
 
 import Foundation
@@ -30,12 +32,20 @@ final class KhmerlangCorrector {
         let roman: BKTree
         let segmenter: KhmerSegmenter
         let specialCases: [String: String]
+        /// User-defined roman→Khmer mappings for exact lookup; the ML
+        /// roman→Khmer path doesn't go through the roman BK-tree these
+        /// mappings also feed, so they get their own layer above the model.
+        let customRoman: [String: String]
     }
 
     /// Guards `treeSet`: `correct`/`segmenter` run on the keyboard's suggestion
     /// queue while finished builds are swapped in from the main thread.
     private let stateLock = NSLock()
     private var treeSet: TreeSet?
+    /// Roman→Khmer transliteration (exact-match shortcut + CoreML model);
+    /// loaded once with the first tree build, nil if its resources are
+    /// missing — the roman BK-tree then keeps serving as the fallback.
+    private var roman2khmer: Roman2KhmerModel?
 
     /// Splits spaceless Khmer runs into words; built with the trees, nil until then.
     var segmenter: KhmerSegmenter? {
@@ -101,12 +111,16 @@ final class KhmerlangCorrector {
             }
             // User-defined mappings from the container app (Android's
             // SpellCorrector.addKhmerWord): joins both trees and the segmenter.
+            var customRoman: [String: String] = [:]
             for mapping in SharedStore.customMappings {
                 khmer.add(mapping.khmer, other: "")
                 khmerCounts[mapping.khmer] = max(khmerCounts[mapping.khmer] ?? 0, 500)
                 maxWordScalars = max(maxWordScalars, mapping.khmer.unicodeScalars.count)
                 let romanized = mapping.roman.trimmingCharacters(in: .whitespaces).lowercased()
-                if !romanized.isEmpty { roman.add(romanized, other: mapping.khmer) }
+                if !romanized.isEmpty {
+                    roman.add(romanized, other: mapping.khmer)
+                    customRoman[romanized] = mapping.khmer
+                }
             }
             let english = BKTree()
             var special: [String: String] = [:]
@@ -117,11 +131,17 @@ final class KhmerlangCorrector {
             let segmenter = KhmerSegmenter(counts: khmerCounts,
                                            maxWordScalars: maxWordScalars,
                                            ml: MLWordSegmenter())
+            self.stateLock.lock()
+            let needsRoman2Khmer = self.roman2khmer == nil
+            self.stateLock.unlock()
+            let roman2khmer = needsRoman2Khmer ? Roman2KhmerModel() : nil
             DispatchQueue.main.async {
                 let set = TreeSet(khmer: khmer, english: english, roman: roman,
-                                  segmenter: segmenter, specialCases: special)
+                                  segmenter: segmenter, specialCases: special,
+                                  customRoman: customRoman)
                 self.stateLock.lock()
                 self.treeSet = set
+                if let roman2khmer { self.roman2khmer = roman2khmer }
                 self.stateLock.unlock()
                 self.builtMappingsVersion = mappingsVersion
                 self.building = false
@@ -171,18 +191,36 @@ final class KhmerlangCorrector {
                              tolerance: tolerance, prevOne: prevOne, prevTwo: prevTwo,
                              isStartSentence: isStartSentence, specialCases: trees.specialCases)
         } else {
-            // Latin input: interleave roman→Khmer transliterations (from the
-            // roman tree, scored with Khmer context) with English corrections,
-            // 2 roman then 2 English — matching the Android SpellCorrector.
-            // Each source is gated by its user toggle (Android's
-            // KEY_RM_CORRECTION_MODE / KEY_EN_CORRECTION_MODE).
+            // Latin input: interleave roman→Khmer transliterations with
+            // English corrections, 2 roman then 2 English — matching the
+            // Android SpellCorrector. Each source is gated by its user toggle
+            // (Android's KEY_RM_CORRECTION_MODE / KEY_EN_CORRECTION_MODE).
+            //
+            // Roman→Khmer comes from the ML bundle (exact-match shortcut,
+            // then Roman2Khmer model predictions, with the user's custom
+            // mappings layered on top); the roman BK-tree only serves when
+            // the model resources failed to load.
             let lower = word.lowercased()
-            let romanOut = SharedStore.romanCorrectionEnabled
-                ? correctBy(dictionary: dictionary, tree: trees.roman, isOther: true,
-                            misspelling: lower, lang: KhmerlangDictionary.langKhmer,
-                            tolerance: tolerance, prevOne: prevOne, prevTwo: prevTwo,
-                            isStartSentence: isStartSentence, specialCases: trees.specialCases)
-                : []
+            stateLock.lock()
+            let roman2khmer = self.roman2khmer
+            stateLock.unlock()
+            var romanOut: [String] = []
+            if SharedStore.romanCorrectionEnabled {
+                if let roman2khmer {
+                    if let custom = trees.customRoman[lower] { romanOut.append(custom) }
+                    for candidate in roman2khmer.suggestions(for: lower, prevWord: prevTwo,
+                                                             isStartSentence: isStartSentence,
+                                                             limit: 6)
+                    where !romanOut.contains(candidate) {
+                        romanOut.append(candidate)
+                    }
+                } else {
+                    romanOut = correctBy(dictionary: dictionary, tree: trees.roman, isOther: true,
+                                         misspelling: lower, lang: KhmerlangDictionary.langKhmer,
+                                         tolerance: tolerance, prevOne: prevOne, prevTwo: prevTwo,
+                                         isStartSentence: isStartSentence, specialCases: trees.specialCases)
+                }
+            }
             if isCancelled() { return [] }
             let englishOut = SharedStore.englishCorrectionEnabled
                 ? correctBy(dictionary: dictionary, tree: trees.english, isOther: false,

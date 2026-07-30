@@ -628,6 +628,9 @@ extension KeyboardViewController: SuggestionBarViewDelegate {
         // cursor (or digits/empty) gets an ordinary space.
         let word = composingContext(before: textDocumentProxy.documentContextBeforeInput ?? "").word
         guard !word.isEmpty, !Self.containsKhmer(word), word.contains(where: \.isLetter) else { return nil }
+        // A custom-mapping or shortcut exact match already ranks first in the
+        // bar; without one, the user chose to still commit the model's top
+        // suggestion rather than insert a plain space.
         return candidate
     }
 
