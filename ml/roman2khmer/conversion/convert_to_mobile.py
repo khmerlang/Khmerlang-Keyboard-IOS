@@ -24,15 +24,15 @@ from training.dataset import load_char_vocab, load_context_vocab, load_split, lo
 from training.model import build_model
 
 
-def convert_tflite(model):
+def convert_tflite(model, tflite_path):
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     tflite_bytes = converter.convert()
-    config.TFLITE_PATH.write_bytes(tflite_bytes)
+    tflite_path.write_bytes(tflite_bytes)
     return tflite_bytes
 
 
-def convert_coreml(model):
+def convert_coreml(model, coreml_path):
     @tf.function
     def f(chars, prev):
         return model({"chars": chars, "prev": prev})
@@ -51,7 +51,7 @@ def convert_coreml(model):
         minimum_deployment_target=ct.target.iOS15,
         compute_precision=ct.precision.FLOAT32,
     )
-    mlmodel.save(str(config.COREML_PATH))
+    mlmodel.save(str(coreml_path))
     return mlmodel
 
 
@@ -107,8 +107,8 @@ def benchmark(fn, inputs, n=50):
     return (time.time() - t0) / n * 1000
 
 
-def main():
-    trained = keras.models.load_model(config.KERAS_MODEL_PATH, safe_mode=False)
+def convert(keras_path, tflite_path, coreml_path, dest_dir):
+    trained = keras.models.load_model(keras_path, safe_mode=False)
     vocab = load_vocab()
     context_vocab = load_context_vocab()
 
@@ -128,12 +128,12 @@ def main():
 
     keras_probs = model.predict(X_sample, verbose=0)
 
-    print("converting to TFLite...")
-    tflite_bytes = convert_tflite(model)
+    print(f"converting {keras_path.name} to TFLite...")
+    tflite_bytes = convert_tflite(model, tflite_path)
     tflite_probs = tflite_predict(tflite_bytes, X_sample)
 
-    print("converting to CoreML...")
-    mlmodel = convert_coreml(model)
+    print(f"converting {keras_path.name} to CoreML...")
+    mlmodel = convert_coreml(model, coreml_path)
 
     max_diff = np.abs(keras_probs - tflite_probs).max()
     top1 = agreement(keras_probs, tflite_probs, 1)
@@ -143,7 +143,7 @@ def main():
     tflite_latency = benchmark(lambda x: tflite_predict(tflite_bytes, x), X_sample)
     print(f"TFLite latency: {tflite_latency:.2f} ms/inference")
 
-    tflite_size_kb = config.TFLITE_PATH.stat().st_size / 1024
+    tflite_size_kb = tflite_path.stat().st_size / 1024
     print(f"TFLite size: {tflite_size_kb:.1f} KB")
 
     try:
@@ -160,15 +160,20 @@ def main():
         coreml_latency = benchmark(lambda x: coreml_predict(mlmodel, x), X_sample)
         print(f"CoreML latency: {coreml_latency:.2f} ms/inference")
 
-    shutil.copy(config.VOCAB_PATH, config.MODEL_DIR / config.VOCAB_PATH.name)
-    shutil.copy(config.CHAR_VOCAB_PATH, config.MODEL_DIR / config.CHAR_VOCAB_PATH.name)
-    shutil.copy(config.CONTEXT_VOCAB_PATH, config.MODEL_DIR / config.CONTEXT_VOCAB_PATH.name)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(config.VOCAB_PATH, dest_dir / config.VOCAB_PATH.name)
+    shutil.copy(config.CHAR_VOCAB_PATH, dest_dir / config.CHAR_VOCAB_PATH.name)
+    shutil.copy(config.CONTEXT_VOCAB_PATH, dest_dir / config.CONTEXT_VOCAB_PATH.name)
 
-    print(f"saved {config.TFLITE_PATH}")
-    print(f"saved {config.COREML_PATH}")
-    print(f"saved {config.MODEL_DIR / config.VOCAB_PATH.name}")
-    print(f"saved {config.MODEL_DIR / config.CHAR_VOCAB_PATH.name}")
-    print(f"saved {config.MODEL_DIR / config.CONTEXT_VOCAB_PATH.name}")
+    print(f"saved {tflite_path}")
+    print(f"saved {coreml_path}")
+    print(f"saved {dest_dir / config.VOCAB_PATH.name}")
+    print(f"saved {dest_dir / config.CHAR_VOCAB_PATH.name}")
+    print(f"saved {dest_dir / config.CONTEXT_VOCAB_PATH.name}")
+
+
+def main():
+    convert(config.KERAS_MODEL_PATH, config.TFLITE_PATH, config.COREML_PATH, config.MODEL_DIR)
 
 
 if __name__ == "__main__":
