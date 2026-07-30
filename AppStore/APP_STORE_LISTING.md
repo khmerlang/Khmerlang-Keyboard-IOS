@@ -14,6 +14,13 @@ all provided copy fits within them.
 
 Khmer subtitle (for the km-KH localization): `វាយអក្សរខ្មែរ ឆ្លាតវៃ` (Smart Khmer typing)
 
+> ⚠️ **v1.0 was rejected (Guideline 5.2.5, July 28 2026):** the App Store Connect
+> app-name field had been left as the Xcode target name `Khmerlang-Keyboard-IOS`,
+> which contains Apple's "iOS" trademark. **The name must NOT contain "iOS".** Use
+> `Khmerlang Keyboard`. This is metadata-only — the shipped binary's display name
+> is already `ខ្មែរឡេង-Khmerlang`, so no rebuild is required, just a metadata edit
+> and a reply to App Review. Do not put "iOS" in the name field for any localization.
+
 ---
 
 ## 2. Promotional Text (170 chars max — editable without a new build)
