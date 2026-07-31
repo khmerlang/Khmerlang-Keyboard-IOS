@@ -626,11 +626,20 @@ extension KeyboardViewController: SuggestionBarViewDelegate {
         else { return nil }
         // Only convert a purely roman composing word; Khmer text under the
         // cursor (or digits/empty) gets an ordinary space.
-        let word = composingContext(before: textDocumentProxy.documentContextBeforeInput ?? "").word
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let (word, _, prevTwo) = composingContext(before: before)
         guard !word.isEmpty, !Self.containsKhmer(word), word.contains(where: \.isLetter) else { return nil }
-        // A custom-mapping or shortcut exact match already ranks first in the
-        // bar; without one, the user chose to still commit the model's top
-        // suggestion rather than insert a plain space.
+        // Silent auto-commit is only safe for a calibrated source: a custom
+        // mapping, the shortcut's unambiguous exact match, or the model's
+        // top-1 guess above its calibrated confidence threshold. The model's
+        // raw top-1 alone is only ~31-35% accurate on held-out data (see
+        // ml/roman2khmer/dist/README.md) and must never be silently
+        // committed just for ranking first in the suggestion bar.
+        let isStartSentence = Self.isSentenceStart(String(before.dropLast(word.count)))
+        guard KhmerlangCorrector.shared.isSafeToAutoCommit(candidate: candidate, word: word,
+                                                            prevWord: prevTwo,
+                                                            isStartSentence: isStartSentence)
+        else { return nil }
         return candidate
     }
 

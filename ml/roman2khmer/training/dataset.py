@@ -15,13 +15,13 @@ def load_char_vocab():
         return json.load(f)
 
 
-def load_vocab():
-    with open(config.VOCAB_PATH, encoding="utf-8") as f:
+def load_vocab(path=None):
+    with open(path or config.VOCAB_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 
-def load_context_vocab():
-    with open(config.CONTEXT_VOCAB_PATH, encoding="utf-8") as f:
+def load_context_vocab(path=None):
+    with open(path or config.CONTEXT_VOCAB_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 

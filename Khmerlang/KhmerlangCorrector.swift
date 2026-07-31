@@ -232,6 +232,24 @@ final class KhmerlangCorrector {
         }
     }
 
+    /// Whether `candidate` is safe to silently auto-commit for the composing
+    /// roman word `word` (the "Space → ខ្មែរ" mode): true for a user-defined
+    /// custom mapping (the user wrote it themselves), the ML shortcut's
+    /// unambiguous exact match, or the model's top-1 guess at or above its
+    /// calibrated confidence threshold -- never the model's raw top-1 alone.
+    /// See Roman2KhmerModel.isSafeAutoCommit.
+    func isSafeToAutoCommit(candidate: String, word: String, prevWord: String,
+                            isStartSentence: Bool) -> Bool {
+        let lower = word.lowercased()
+        stateLock.lock()
+        let isCustomMatch = treeSet?.customRoman[lower] == candidate
+        let roman2khmer = self.roman2khmer
+        stateLock.unlock()
+        if isCustomMatch { return true }
+        return roman2khmer?.isSafeAutoCommit(candidate, for: lower, prevWord: prevWord,
+                                             isStartSentence: isStartSentence) ?? false
+    }
+
     /// Interleave two candidate lists as 2-from-a, 2-from-b, repeating.
     private func interleave(_ a: [String], _ b: [String]) -> [String] {
         var output: [String] = []

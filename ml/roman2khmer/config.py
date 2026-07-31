@@ -59,6 +59,27 @@ HISTORY_V4_PATH = MODEL_DIR / "training_history_v4.csv"
 TRAIN_V4_PATH = DATASET_DIR / "train_v4.jsonl"
 AMBIGUOUS_OVERSAMPLE_BONUS = 2   # extra multiplier on oversample_factor for fully-ambiguous words
 
+# v5 experiment: same architecture + oversampling recipe as v3, but shrinks
+# the vocabulary itself to higher-frequency words (count >= MIN_WORD_COUNT_V5,
+# vs. the shipped MIN_WORD_COUNT=5) instead of keeping the full vocab and
+# reweighting it -- fewer classes to discriminate between should be easier to
+# learn per class, at the cost of the lowest-frequency words becoming fully
+# unreachable (not just harder to rank, like v3/v4's ambiguous words -- gone
+# from the vocabulary entirely, so this isn't a drop-in replacement for the
+# shipped model without also giving up coverage on those words elsewhere,
+# e.g. falling back to the roman BK-tree). Own vocab/context_vocab/train/val
+# files -- a different label space, not shared with the base vocabulary. See
+# comparison/compare_vocab.py for the apples-to-apples comparison against v3
+# restricted to the same surviving high-frequency words.
+MIN_WORD_COUNT_V5 = 20
+VOCAB_V5_PATH = ARTIFACTS_DIR / "vocab_v5.json"
+CONTEXT_VOCAB_V5_PATH = ARTIFACTS_DIR / "context_vocab_v5.json"
+TRAIN_V5_PATH = DATASET_DIR / "train_v5.jsonl"
+VAL_V5_PATH = DATASET_DIR / "val_v5.jsonl"
+TRAIN_V5_OVERSAMPLED_PATH = DATASET_DIR / "train_v5_oversampled.jsonl"
+KERAS_MODEL_V5_PATH = MODEL_DIR / "roman2khmer_v5.keras"
+HISTORY_V5_PATH = MODEL_DIR / "training_history_v5.csv"
+
 # Data export
 MIN_WORD_COUNT = 5          # vocab filter: keep Khmer unigrams with count >= this
 MIN_PREFIX_LEN = 2          # never generate a prefix shorter than this

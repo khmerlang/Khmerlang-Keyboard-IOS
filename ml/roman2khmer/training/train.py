@@ -16,13 +16,18 @@ from training.dataset import load_char_vocab, load_context_vocab, load_split, lo
 from training.model import build_model
 
 
-def train(train_path, keras_path, history_path, use_sample_weight=True):
+def train(train_path, keras_path, history_path, use_sample_weight=True,
+          val_path=None, vocab_path=None, context_vocab_path=None):
+    """vocab_path/context_vocab_path/val_path default to the shipped
+    MIN_WORD_COUNT=5 vocabulary's files; pass the v5 (config.VOCAB_V5_PATH
+    etc.) paths to train on the smaller, high-frequency-only vocabulary
+    instead -- see training/train_v5.py."""
     char_vocab = load_char_vocab()
-    vocab = load_vocab()
-    context_vocab = load_context_vocab()
+    vocab = load_vocab(vocab_path)
+    context_vocab = load_context_vocab(context_vocab_path)
 
     X_train, y_train, w_train, _ = load_split(train_path, char_vocab, context_vocab)
-    X_val, y_val, w_val, _ = load_split(config.VAL_PATH, char_vocab, context_vocab)
+    X_val, y_val, w_val, _ = load_split(val_path or config.VAL_PATH, char_vocab, context_vocab)
     if not use_sample_weight:
         w_train = None  # oversampling already encodes frequency preference via row duplication
 

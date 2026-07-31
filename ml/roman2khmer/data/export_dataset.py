@@ -31,12 +31,12 @@ from comparison.shortcut import build_shortcut_map
 ROMAN_RE = config.ROMAN_RE
 
 
-def load_words(conn):
+def load_words(conn, min_count=config.MIN_WORD_COUNT):
     """Returns [(word, count, [variants]), ...] for the filtered vocabulary."""
     rows = conn.execute(
         "SELECT keyword, count, other FROM ngram "
         "WHERE gram = 1 AND lang = 0 AND other != '' AND count >= ?",
-        (config.MIN_WORD_COUNT,),
+        (min_count,),
     ).fetchall()
 
     words = []
@@ -84,9 +84,16 @@ def prefix_lengths(length, max_prefixes=config.MAX_PREFIXES_PER_VARIANT, min_len
 
 
 def build_examples(variant):
-    """Returns [(text, is_full), ...] for one romanized variant."""
-    examples = [(variant, True)]
-    examples += [(variant[:n], False) for n in prefix_lengths(len(variant))]
+    """Returns [(text, is_full, full_len), ...] for one romanized variant.
+    full_len is len(variant) in every row -- carried alongside the (usually
+    truncated) text so a prefix row still knows what fraction of the full
+    romanized spelling it represents (see evaluation/evaluate.py's
+    typed-fraction breakdown, which needs this against the *romanized*
+    length -- the Khmer target word's length is a different, non-comparable
+    unit)."""
+    full_len = len(variant)
+    examples = [(variant, True, full_len)]
+    examples += [(variant[:n], False, full_len) for n in prefix_lengths(len(variant))]
     return examples
 
 
@@ -118,12 +125,12 @@ def split_examples(rng, variants):
     return train, val
 
 
-def augment(text, is_full, word, label, count, context_pool, rng):
-    """Expands one (text, is_full) example into 1-2 rows: the example itself
-    plus (usually) a typo-noised copy, each independently paired with a
-    previous-word context token sampled from the word's real bigram
-    distribution (so common contexts appear more often, exactly like the
-    training data for the rest of the model)."""
+def augment(text, is_full, full_len, word, label, count, context_pool, rng):
+    """Expands one (text, is_full, full_len) example into 1-2 rows: the
+    example itself plus (usually) a typo-noised copy, each independently
+    paired with a previous-word context token sampled from the word's real
+    bigram distribution (so common contexts appear more often, exactly like
+    the training data for the rest of the model)."""
     variants = [(text, False)]
     noisy = apply_typo(text, rng)
     if noisy != text:
@@ -143,6 +150,7 @@ def augment(text, is_full, word, label, count, context_pool, rng):
             "is_full": is_full,
             "is_typo": is_typo,
             "count": count,
+            "full_len": full_len,
         })
     return rows
 
@@ -173,8 +181,8 @@ def build_dataset(words, context_by_word):
         context_pool = context_by_word.get(word)
         train_base_by_word.append((word, label, count, context_pool, train_base))
         for base, out in [(train_base, train_rows), (val_base, val_rows)]:
-            for text, is_full in base:
-                out.extend(augment(text, is_full, word, label, count, context_pool, augment_rng))
+            for text, is_full, full_len in base:
+                out.extend(augment(text, is_full, full_len, word, label, count, context_pool, augment_rng))
 
     return train_rows, val_rows, train_base_by_word
 
@@ -189,8 +197,8 @@ def build_oversampled_train(train_base_by_word):
     for word, label, count, context_pool, train_base in train_base_by_word:
         factor = oversample_factor(count)
         for _ in range(factor):
-            for text, is_full in train_base:
-                rows.extend(augment(text, is_full, word, label, count, context_pool, rng))
+            for text, is_full, full_len in train_base:
+                rows.extend(augment(text, is_full, full_len, word, label, count, context_pool, rng))
     return rows
 
 
@@ -226,8 +234,8 @@ def build_oversampled_train_v4(train_base_by_word, ambiguous_words):
     for word, label, count, context_pool, train_base in train_base_by_word:
         factor = oversample_factor_v4(count, word in ambiguous_words)
         for _ in range(factor):
-            for text, is_full in train_base:
-                rows.extend(augment(text, is_full, word, label, count, context_pool, rng))
+            for text, is_full, full_len in train_base:
+                rows.extend(augment(text, is_full, full_len, word, label, count, context_pool, rng))
     return rows
 
 
@@ -237,35 +245,62 @@ def write_jsonl(path, rows):
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+def export_vocab_and_splits(conn, min_count, vocab_path, context_vocab_path, train_path, val_path):
+    """Runs the full words -> vocab/context_vocab/train/val export for one
+    MIN_WORD_COUNT threshold. Used for both the shipped vocabulary
+    (min_count=config.MIN_WORD_COUNT) and the smaller, high-frequency-only v5
+    experiment (min_count=config.MIN_WORD_COUNT_V5) -- each threshold gets
+    its own vocab/context_vocab/label space, not shared with the other.
+
+    Returns (vocab, train_rows, val_rows, context_by_word, train_base_by_word)
+    -- the last is reused by build_oversampled_train()/_v4() to build an
+    oversampled train set on top without recomputing the word/variant split.
+    """
+    words = load_words(conn, min_count)
+    words.sort(key=lambda w: -w[1])  # stable, deterministic label ordering by frequency desc
+    vocab_set = {word for word, _count, _variants in words}
+    context_by_word = load_bigram_context(conn, vocab_set)
+
+    vocab = [word for word, _count, _variants in words]
+    train_rows, val_rows, train_base_by_word = build_dataset(words, context_by_word)
+    write_jsonl(train_path, train_rows)
+    write_jsonl(val_path, val_rows)
+
+    with open(vocab_path, "w", encoding="utf-8") as f:
+        json.dump(vocab, f, ensure_ascii=False, indent=2)
+
+    context_vocab = [config.CONTEXT_UNK, config.CONTEXT_S] + vocab
+    with open(context_vocab_path, "w", encoding="utf-8") as f:
+        json.dump(context_vocab, f, ensure_ascii=False, indent=2)
+
+    return vocab, train_rows, val_rows, context_by_word, train_base_by_word
+
+
 def main():
     config.DATASET_DIR.mkdir(parents=True, exist_ok=True)
     config.ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(str(config.SQLITE_PATH))
-    words = load_words(conn)
-    words.sort(key=lambda w: -w[1])  # stable, deterministic label ordering by frequency desc
-    vocab_set = {word for word, _count, _variants in words}
-    context_by_word = load_bigram_context(conn, vocab_set)
+
+    vocab, train_rows, val_rows, context_by_word, train_base_by_word = export_vocab_and_splits(
+        conn, config.MIN_WORD_COUNT, config.VOCAB_PATH, config.CONTEXT_VOCAB_PATH,
+        config.TRAIN_PATH, config.VAL_PATH,
+    )
+    v5_vocab, v5_train_rows, v5_val_rows, _v5_context_by_word, v5_train_base_by_word = export_vocab_and_splits(
+        conn, config.MIN_WORD_COUNT_V5, config.VOCAB_V5_PATH, config.CONTEXT_VOCAB_V5_PATH,
+        config.TRAIN_V5_PATH, config.VAL_V5_PATH,
+    )
     conn.close()
 
-    vocab = [word for word, _count, _variants in words]
-    train_rows, val_rows, train_base_by_word = build_dataset(words, context_by_word)
     train_v3_rows = build_oversampled_train(train_base_by_word)
-
-    ambiguous_words = fully_ambiguous_words(vocab_set)
-    train_v4_rows = build_oversampled_train_v4(train_base_by_word, ambiguous_words)
-
-    write_jsonl(config.TRAIN_PATH, train_rows)
-    write_jsonl(config.VAL_PATH, val_rows)
     write_jsonl(config.TRAIN_V3_PATH, train_v3_rows)
+
+    ambiguous_words = fully_ambiguous_words(set(vocab))
+    train_v4_rows = build_oversampled_train_v4(train_base_by_word, ambiguous_words)
     write_jsonl(config.TRAIN_V4_PATH, train_v4_rows)
 
-    with open(config.VOCAB_PATH, "w", encoding="utf-8") as f:
-        json.dump(vocab, f, ensure_ascii=False, indent=2)
-
-    context_vocab = [config.CONTEXT_UNK, config.CONTEXT_S] + vocab
-    with open(config.CONTEXT_VOCAB_PATH, "w", encoding="utf-8") as f:
-        json.dump(context_vocab, f, ensure_ascii=False, indent=2)
+    v5_train_oversampled_rows = build_oversampled_train(v5_train_base_by_word)
+    write_jsonl(config.TRAIN_V5_OVERSAMPLED_PATH, v5_train_oversampled_rows)
 
     char_vocab = {
         "pad_index": config.PAD_INDEX,
@@ -277,13 +312,17 @@ def main():
         json.dump(char_vocab, f, ensure_ascii=False, indent=2)
 
     print(f"vocab size: {len(vocab)}")
-    print(f"context vocab size: {len(context_vocab)}")
+    print(f"context vocab size: {len(vocab) + 2}")
     print(f"words with bigram context: {len(context_by_word)}")
     print(f"train rows: {len(train_rows)}")
     print(f"val rows:   {len(val_rows)}")
     print(f"train_v3 (oversampled) rows: {len(train_v3_rows)}")
     print(f"fully-ambiguous words (no unambiguous romanization): {len(ambiguous_words)}/{len(vocab)}")
     print(f"train_v4 (ambiguous-focused oversampled) rows: {len(train_v4_rows)}")
+    print(f"v5 vocab size (count >= {config.MIN_WORD_COUNT_V5}): {len(v5_vocab)}")
+    print(f"v5 train rows: {len(v5_train_rows)}")
+    print(f"v5 val rows:   {len(v5_val_rows)}")
+    print(f"v5 train (oversampled) rows: {len(v5_train_oversampled_rows)}")
 
 
 if __name__ == "__main__":

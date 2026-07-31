@@ -92,11 +92,16 @@ def main():
             continue
         print(f"    {kind:14s} {fmt(hit1, hit3, hit5, mask, counts)}")
 
-    # Bucket prefix examples by how much of the word was typed.
+    # Bucket prefix examples by how much of the word was typed. Both sides
+    # must be in the same unit (romanized characters): row["word"] is the
+    # Khmer target word, a different alphabet with a different character
+    # count, so it can't be the denominator here -- row["full_len"] (added
+    # by data/export_dataset.py) is the length of the full romanized variant
+    # this prefix was truncated from.
     prefix_idx = np.where(~is_full)[0]
     if len(prefix_idx) > 0:
         typed_fraction = np.array(
-            [len(rows[i]["roman"]) / max(len(rows[i]["word"]), 1) for i in prefix_idx]
+            [len(rows[i]["roman"]) / max(rows[i]["full_len"], 1) for i in prefix_idx]
         )
         quartiles = np.quantile(typed_fraction, [0.25, 0.5, 0.75])
         bucket_edges = [0.0] + list(quartiles) + [1.0]

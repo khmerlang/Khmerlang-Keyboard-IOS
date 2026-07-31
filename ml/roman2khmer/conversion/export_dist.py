@@ -8,8 +8,8 @@ every romanization that's unambiguous across the full sqlite unigram table
 (see comparison/shortcut.py) -- the two combined gave the best numbers in
 every slice of that comparison. Also ships a small confidence.json summary
 (evaluation/calibrate_confidence.py) recommending an ML-fallback confidence
-threshold for words the shortcut doesn't resolve -- for future Swift
-auto-commit integration to consume; not wired in yet.
+threshold for words the shortcut doesn't resolve -- consumed by
+Roman2KhmerModel.swift's isSafeAutoCommit to gate silent auto-commit.
 
 Usage: python -m conversion.export_dist   (run from ml/roman2khmer/)
 """
@@ -62,8 +62,11 @@ def main():
             "description": (
                 "Recommended ML top-1 confidence thresholds for words NOT resolved by "
                 "shortcut.json, measured on held-out val.jsonl (v3 model, is_full rows "
-                "only). Not yet consumed by the iOS/Android apps -- for future auto-commit "
-                "integration. 'threshold' is the softmax top-1 probability cutoff; "
+                "only). Consumed by Roman2KhmerModel.swift's isSafeAutoCommit to gate "
+                "'Space -> Khmer': the '0.99' entry's threshold is the minimum top-1 "
+                "softmax probability the model must clear before its own guess (as "
+                "opposed to a shortcut/custom-mapping hit) is trusted enough to silently "
+                "commit. 'threshold' is the softmax top-1 probability cutoff; "
                 "'weighted_coverage' is the frequency-weighted fraction of the ML-fallback "
                 "population that clears it."
             ),

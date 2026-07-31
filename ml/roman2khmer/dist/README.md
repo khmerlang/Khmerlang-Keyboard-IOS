@@ -39,10 +39,11 @@ specifically to disambiguate those using the previous word.
 - `confidence.json` -- for words the shortcut does *not* resolve, a menu of
   recommended ML top-1 softmax confidence thresholds (evaluated on held-out
   data, at target frequency-weighted precision bars of 95/97/99%) and the
-  coverage each buys. Intended for a future auto-commit gate: only trust
-  the model's top-1 above the chosen threshold, otherwise just populate the
-  suggestion bar without committing. **Not yet consumed by the iOS/Android
-  apps.**
+  coverage each buys. Consumed by `Roman2KhmerModel.isSafeAutoCommit` (the
+  `0.99` entry's threshold): only the model's top-1 guess above that
+  threshold -- or a shortcut/custom-mapping hit -- is trusted enough for
+  `KeyboardViewController.autoCommitTarget` to silently commit; everything
+  else still populates the suggestion bar without committing.
 
 ## Known limitations (not yet addressed by this bundle)
 
@@ -50,20 +51,21 @@ specifically to disambiguate those using the previous word.
   on held-out data is roughly 31%/45%/51% overall (see
   `comparison/compare_all.py` output) -- useful as a ranked suggestion-bar
   candidate, not a silent auto-correct/auto-commit.
-- The **combined system** (shortcut, then model as fallback, no confidence
-  gating) does much better on fully-typed words: shortcut resolves 43.3% of
-  full-word inputs outright (100% correct by construction), taking combined
-  top-1 from 35.8% (model alone) to 61.4% (uniform) / 53.0%
-  (frequency-weighted) on that population. The remaining ~57% that reach
-  the model are still the hard, ambiguous-spelling cases --
-  `evaluation/calibrate_confidence.py`'s sweep shows they only clear ~99%
-  weighted precision at a confidence threshold of 1.00, and even then at
-  well under 1% coverage of that fallback population -- i.e. the model
-  cannot yet be trusted for silent auto-commit on its own even with
-  confidence gating; only the deterministic shortcut layer is currently
-  safe to auto-commit from.
+- The **combined system** (shortcut, then model as fallback) does much
+  better on fully-typed words: shortcut resolves 43.3% of full-word inputs
+  outright (100% correct by construction), taking combined top-1 from 35.8%
+  (model alone) to 61.4% (uniform) / 53.0% (frequency-weighted) on that
+  population. The remaining ~57% that reach the model are still the hard,
+  ambiguous-spelling cases -- `evaluation/calibrate_confidence.py`'s sweep
+  shows they only clear ~99% weighted precision at a confidence threshold
+  of 1.00, and even then at well under 1% coverage of that fallback
+  population. That's why `isSafeAutoCommit` gates the model's contribution
+  so tightly: in practice, almost all silent auto-commits come from the
+  deterministic shortcut/custom-mapping layer, with the model's own guess
+  only ever committed on the rare case it clears threshold 1.00 -- otherwise
+  it still ranks in the suggestion bar, just not auto-committed.
 - CoreML inference was exported but not runtime-validated (coremltools can
   only run predictions on macOS); validate on a Mac/iOS device before
   shipping.
-- Not yet wired into `KhmerlangCorrector`/`SuggestionProvider` (iOS) or the
-  Android equivalent -- that integration is a separate follow-up.
+- Wired into `KhmerlangCorrector`/`Roman2KhmerModel` (iOS); the Android
+  equivalent is a separate follow-up.
