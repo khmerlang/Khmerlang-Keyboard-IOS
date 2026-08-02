@@ -186,7 +186,7 @@ or QuickTime on device. Portrait, no hands/device frames, first 3 seconds must h
   > Try Roman-to-Khmer: type "somleng" and tap the Khmer suggestion.
 
 - **Sign-in required:** No
-- **Contact:** your phone + rathanak@ailsa.io (or a khmerlang.com address)
+- **Contact:** support@khmerlang.com
 
 ## 8. Other App Store Connect settings
 

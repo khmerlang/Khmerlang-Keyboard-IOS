@@ -48,3 +48,8 @@ To publish at your production URL:
 ## License
 
 This project is licensed under the GNU General Public License v3.0 — see [LICENSE](LICENSE).
+
+Note: GPLv3's terms (notably §6/§7 on additional restrictions) are widely
+considered to be in tension with the Apple App Store's distribution terms.
+If you plan to redistribute a build of this app through an app store,
+review that compatibility yourself before doing so.
