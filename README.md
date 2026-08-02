@@ -2,6 +2,12 @@
 
 Khmerlang is an iOS app plus custom keyboard extension for Khmer + English typing.
 
+## Download
+
+- App Store: https://apps.apple.com/us/app/khmerlang-keyboard/id6792233688
+- Google Play (Android version): https://play.google.com/store/apps/details?id=com.rathanak.khmerroman
+- Android source: https://github.com/khmerlang/Khmerlang-Keyboard
+
 ## Production Defaults
 
 - Cloud spell check is opt-in by default.
